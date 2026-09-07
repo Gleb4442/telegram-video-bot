@@ -1,5 +1,4 @@
 import { Bot, GrammyError, HttpError, InlineKeyboard, InlineQueryResultBuilder, InputMediaBuilder } from 'grammy';
-import type { UserFromGetMe } from 'grammy/types';
 import { getConfig } from './config.js';
 import { extractSupportedUrls, resolveVideo } from './services/resolvers/index.js';
 import { ResolvedVideo, ResolverError, SupportedPlatform } from './types/resolver.js';
@@ -21,10 +20,12 @@ export function setUserPreferences(userId: number, prefs: Partial<UserPreference
   userPrefsMap.set(userId, { ...current, ...prefs });
 }
 
+export type BotInfo = NonNullable<ConstructorParameters<typeof Bot>[1]>['botInfo'];
+
 /**
  * Static bot info to eliminate Telegram API getMe round-trip on Vercel cold starts.
  */
-export const defaultBotInfo: UserFromGetMe = {
+export const defaultBotInfo: BotInfo = {
   id: 8894030664,
   is_bot: true,
   first_name: 'TRS bot',
@@ -84,7 +85,7 @@ export function formatCaption(video: ResolvedVideo): string {
 /**
  * Factory function to create and configure the grammY Bot instance.
  */
-export function createBot(customToken?: string, customBotInfo?: UserFromGetMe): Bot {
+export function createBot(customToken?: string, customBotInfo?: BotInfo): Bot {
   const token = customToken || getConfig().TELEGRAM_BOT_TOKEN;
   const botInfo = customBotInfo || defaultBotInfo;
 
