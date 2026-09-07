@@ -1,5 +1,5 @@
 import { Bot, GrammyError, HttpError, InlineKeyboard, InlineQueryResultBuilder, InputMediaBuilder } from 'grammy';
-import { UserFromGetMe } from 'grammy/types';
+import type { UserFromGetMe } from 'grammy/types';
 import { getConfig } from './config.js';
 import { extractSupportedUrls, resolveVideo } from './services/resolvers/index.js';
 import { ResolvedVideo, ResolverError, SupportedPlatform } from './types/resolver.js';
