@@ -12,6 +12,14 @@ const TikWMApiSchema = z.object({
       play: z.string().optional(),
       wmplay: z.string().optional(),
       hdplay: z.string().optional(),
+      music: z.string().optional(),
+      music_info: z
+        .object({
+          play: z.string().optional(),
+          title: z.string().optional(),
+          author: z.string().optional(),
+        })
+        .optional(),
       size: z.number().optional(),
       duration: z.number().optional(),
       author: z
@@ -39,8 +47,6 @@ export class TikTokResolver implements VideoResolver {
     const cleanUrl = url.trim();
 
     try {
-      // TikWM API accepts POST with url or GET with query parameter.
-      // We send a POST request with form-data/urlencoded payload and a standard User-Agent.
       const endpoint = 'https://www.tikwm.com/api/';
       const response = await fetchWithTimeout(endpoint, {
         method: 'POST',
@@ -76,7 +82,6 @@ export class TikTokResolver implements VideoResolver {
 
       const { code, msg, data } = parseResult.data;
 
-      // TikWM returns code === 0 on success
       if (code !== 0 || !data) {
         const message = msg || 'Could not retrieve video stream';
         if (/url.*fail|invalid|check url/i.test(message)) {
@@ -100,8 +105,7 @@ export class TikTokResolver implements VideoResolver {
         );
       }
 
-      // 'play' is the clean video without watermark.
-      // In rare cases TikWM returns a relative URL starting with '/'
+      // Prioritize Full HD 1080p stream over standard SD
       let directUrl = data.hdplay || data.play || data.wmplay;
       if (!directUrl) {
         throw new ResolverError(
@@ -115,8 +119,15 @@ export class TikTokResolver implements VideoResolver {
         directUrl = `https://www.tikwm.com${directUrl}`;
       }
 
+      // Extract direct audio MP3 stream
+      let audioUrl = data.music || data.music_info?.play;
+      if (audioUrl && audioUrl.startsWith('/')) {
+        audioUrl = `https://www.tikwm.com${audioUrl}`;
+      }
+
       return {
         directUrl,
+        audioUrl,
         title: data.title?.trim() || undefined,
         platform: this.platform,
         durationSeconds: data.duration,

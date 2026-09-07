@@ -8,6 +8,7 @@ const CobaltModernSchema = z.object({
   status: z.enum(['tunnel', 'redirect', 'picker', 'local-processing', 'error']),
   url: z.string().url().optional(),
   filename: z.string().optional(),
+  audio: z.string().url().optional(),
   picker: z
     .array(
       z.object({
@@ -38,6 +39,18 @@ export const INSTAGRAM_URL_REGEX =
 
 export const YOUTUBE_SHORTS_REGEX =
   /https?:\/\/(?:(?:www|m)\.)?youtube\.com\/(?:shorts\/|watch\?v=)|https?:\/\/youtu\.be\/([A-Za-z0-9_-]+)/i;
+
+export const TWITTER_URL_REGEX =
+  /https?:\/\/(?:(?:www|mobile)\.)?(?:twitter\.com|x\.com)\/(?:#!\/)?[a-zA-Z0-9_]+\/status\/(\d+)/i;
+
+export const REDDIT_URL_REGEX =
+  /https?:\/\/(?:(?:www|v|old)\.)?reddit\.com\/r\/[a-zA-Z0-9_]+\/comments\/[a-zA-Z0-9_]+|https?:\/\/redd\.it\/[a-zA-Z0-9_]+/i;
+
+export const THREADS_URL_REGEX =
+  /https?:\/\/(?:www\.)?threads\.(?:net|com)\/(?:@[a-zA-Z0-9_.-]+\/post|t)\/([a-zA-Z0-9_-]+)/i;
+
+export const PINTEREST_URL_REGEX =
+  /https?:\/\/(?:[a-zA-Z0-9_.-]+\.)?(?:pinterest\.[a-z.]+|pin\.it)\/[a-zA-Z0-9_./-]+/i;
 
 /**
  * Executes request to Cobalt API instance and extracts direct playable video URL.
@@ -70,6 +83,7 @@ export async function resolveWithCobalt(
     videoQuality: 'max',
     downloadMode: 'auto',
     youtubeVideoCodec: 'h264',
+    youtubeBetterAudio: true,
     disableMetadata: false,
   };
 
@@ -157,17 +171,18 @@ export async function resolveWithCobalt(
     if ((data.status === 'tunnel' || data.status === 'redirect') && data.url) {
       return {
         directUrl: data.url,
+        audioUrl: data.audio,
         title: data.filename,
         platform,
       };
     }
 
     if (data.status === 'picker' && data.picker && data.picker.length > 0) {
-      // Find the first video item, or default to the first available item
       const videoItem = data.picker.find((p) => p.type === 'video') ?? data.picker[0];
       if (videoItem && videoItem.url) {
         return {
           directUrl: videoItem.url,
+          audioUrl: data.audio,
           platform,
         };
       }
@@ -178,6 +193,7 @@ export async function resolveWithCobalt(
       if (firstTunnel) {
         return {
           directUrl: firstTunnel,
+          audioUrl: data.audio,
           platform,
         };
       }
@@ -204,25 +220,41 @@ export async function resolveWithCobalt(
 export class InstagramResolver implements VideoResolver {
   readonly name = 'Instagram Reels Cobalt Resolver';
   readonly platform = 'instagram' as const;
-
-  supports(url: string): boolean {
-    return INSTAGRAM_URL_REGEX.test(url.trim());
-  }
-
-  async resolve(url: string): Promise<ResolvedVideo> {
-    return resolveWithCobalt(url, this.platform);
-  }
+  supports(url: string): boolean { return INSTAGRAM_URL_REGEX.test(url.trim()); }
+  async resolve(url: string): Promise<ResolvedVideo> { return resolveWithCobalt(url, this.platform); }
 }
 
 export class YouTubeResolver implements VideoResolver {
   readonly name = 'YouTube Shorts Cobalt Resolver';
   readonly platform = 'youtube' as const;
+  supports(url: string): boolean { return YOUTUBE_SHORTS_REGEX.test(url.trim()); }
+  async resolve(url: string): Promise<ResolvedVideo> { return resolveWithCobalt(url, this.platform); }
+}
 
-  supports(url: string): boolean {
-    return YOUTUBE_SHORTS_REGEX.test(url.trim());
-  }
+export class TwitterResolver implements VideoResolver {
+  readonly name = 'Twitter/X Cobalt Resolver';
+  readonly platform = 'twitter' as const;
+  supports(url: string): boolean { return TWITTER_URL_REGEX.test(url.trim()); }
+  async resolve(url: string): Promise<ResolvedVideo> { return resolveWithCobalt(url, this.platform); }
+}
 
-  async resolve(url: string): Promise<ResolvedVideo> {
-    return resolveWithCobalt(url, this.platform);
-  }
+export class RedditResolver implements VideoResolver {
+  readonly name = 'Reddit Cobalt Resolver';
+  readonly platform = 'reddit' as const;
+  supports(url: string): boolean { return REDDIT_URL_REGEX.test(url.trim()); }
+  async resolve(url: string): Promise<ResolvedVideo> { return resolveWithCobalt(url, this.platform); }
+}
+
+export class ThreadsResolver implements VideoResolver {
+  readonly name = 'Threads Cobalt Resolver';
+  readonly platform = 'threads' as const;
+  supports(url: string): boolean { return THREADS_URL_REGEX.test(url.trim()); }
+  async resolve(url: string): Promise<ResolvedVideo> { return resolveWithCobalt(url, this.platform); }
+}
+
+export class PinterestResolver implements VideoResolver {
+  readonly name = 'Pinterest Cobalt Resolver';
+  readonly platform = 'pinterest' as const;
+  supports(url: string): boolean { return PINTEREST_URL_REGEX.test(url.trim()); }
+  async resolve(url: string): Promise<ResolvedVideo> { return resolveWithCobalt(url, this.platform); }
 }

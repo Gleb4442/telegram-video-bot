@@ -1,7 +1,7 @@
 import { Bot, GrammyError, HttpError, InlineKeyboard } from 'grammy';
 import { getConfig } from './config.js';
 import { extractSupportedUrls, resolveVideo } from './services/resolvers/index.js';
-import { ResolvedVideo, ResolverError } from './types/resolver.js';
+import { ResolvedVideo, ResolverError, SupportedPlatform } from './types/resolver.js';
 
 /**
  * Escapes special HTML characters for Telegram HTML parse mode.
@@ -17,14 +17,18 @@ export function escapeHtml(text: string): string {
  * Formats a clean caption for the video message.
  */
 export function formatCaption(video: ResolvedVideo): string {
-  const platformIcons: Record<ResolvedVideo['platform'], string> = {
+  const platformIcons: Record<SupportedPlatform, string> = {
     tiktok: '🎵 TikTok',
     instagram: '📸 Instagram',
     youtube: '▶️ YouTube Shorts',
+    twitter: '𝕏 Twitter / X',
+    reddit: '🤖 Reddit',
+    threads: '🧵 Threads',
+    pinterest: '📌 Pinterest',
   };
 
   const lines: string[] = [];
-  lines.push(`<b>${platformIcons[video.platform]}</b>`);
+  lines.push(`<b>${platformIcons[video.platform] || '🎬 Видео'}</b>`);
 
   if (video.title && !video.title.endsWith('.mp4')) {
     const cleanTitle = video.title.length > 200 ? `${video.title.slice(0, 197)}...` : video.title;
@@ -63,13 +67,17 @@ export function createBot(customToken?: string): Bot {
   // /start command
   bot.command('start', async (ctx) => {
     const welcomeText =
-      `👋 <b>Добро пожаловать в Video Downloader!</b>\n\n` +
-      `Я скачиваю видео <b>в максимальном HD качестве без водяных знаков</b> из:\n` +
-      `• <b>TikTok</b> (Full HD 1080p)\n` +
-      `• <b>Instagram Reels & посты</b>\n` +
-      `• <b>YouTube Shorts</b>\n\n` +
+      `👋 <b>Добро пожаловать в Universal Media Downloader!</b>\n\n` +
+      `Я скачиваю видео <b>в максимальном HD-качестве без водяных знаков</b> из:\n` +
+      `• 🎵 <b>TikTok</b> (Full HD 1080p + аудио)\n` +
+      `• 📸 <b>Instagram</b> (Reels & посты)\n` +
+      `• ▶️ <b>YouTube Shorts</b>\n` +
+      `• 𝕏 <b>Twitter / X</b>\n` +
+      `• 🤖 <b>Reddit</b>\n` +
+      `• 🧵 <b>Threads</b>\n` +
+      `• 📌 <b>Pinterest</b>\n\n` +
       `🚀 <b>Как пользоваться:</b>\n` +
-      `Просто отправьте или перешлите мне любую ссылку на видео.`;
+      `Просто отправьте или перешлите мне ссылку на любое видео.`;
 
     await ctx.reply(welcomeText, { parse_mode: 'HTML' });
   });
@@ -79,10 +87,14 @@ export function createBot(customToken?: string): Bot {
     const helpText =
       `📖 <b>Поддерживаемые платформы</b>\n\n` +
       `Отправьте ссылку одного из следующих форматов:\n\n` +
-      `🎵 <b>TikTok:</b> tiktok.com / vm.tiktok.com / vt.tiktok.com\n` +
-      `📸 <b>Instagram:</b> instagram.com/reel/... или /p/...\n` +
-      `▶️ <b>YouTube Shorts:</b> youtube.com/shorts/... или youtu.be/...\n\n` +
-      `⚡ Видео скачиваются без водяных знаков в наилучшем доступном разрешении.`;
+      `• 🎵 <b>TikTok:</b> tiktok.com / vm.tiktok.com / vt.tiktok.com\n` +
+      `• 📸 <b>Instagram:</b> instagram.com/reel/... или /p/...\n` +
+      `• ▶️ <b>YouTube Shorts:</b> youtube.com/shorts/... или youtu.be/...\n` +
+      `• 𝕏 <b>Twitter / X:</b> twitter.com/... или x.com/...\n` +
+      `• 🤖 <b>Reddit:</b> reddit.com/r/... или redd.it/...\n` +
+      `• 🧵 <b>Threads:</b> threads.net/@...\n` +
+      `• 📌 <b>Pinterest:</b> pin.it/... или pinterest.com/...\n\n` +
+      `⚡ Ролики отправляются в наилучшем качестве с кнопками скачивания HD и аудио (MP3).`;
 
     await ctx.reply(helpText, { parse_mode: 'HTML' });
   });
@@ -101,14 +113,13 @@ export function createBot(customToken?: string): Bot {
       if (ctx.chat.type === 'private') {
         await ctx.reply(
           `🔍 Не найдено поддерживаемой ссылки на видео.\n\n` +
-          `Отправьте ссылку из <b>TikTok</b>, <b>Instagram Reels</b> или <b>YouTube Shorts</b>.`,
+          `Поддерживаются: <b>TikTok, Instagram, YouTube Shorts, Twitter/X, Reddit, Threads, Pinterest</b>.`,
           { parse_mode: 'HTML', reply_to_message_id: ctx.message.message_id }
         );
       }
       return;
     }
 
-    // Process each supported link (limit to 3 per message)
     const targetUrls = urls.slice(0, 3);
 
     for (const url of targetUrls) {
@@ -121,7 +132,12 @@ export function createBot(customToken?: string): Bot {
       try {
         const resolved = await resolveVideo(url);
         const caption = formatCaption(resolved);
+
+        // Build inline keyboard with direct HD and audio buttons
         const keyboard = new InlineKeyboard().url('📥 Скачать в HD (без сжатия)', resolved.directUrl);
+        if (resolved.audioUrl) {
+          keyboard.row().url('🎧 Скачать аудио (MP3)', resolved.audioUrl);
+        }
 
         try {
           // Send with supports_streaming to preserve high-bitrate streaming playback
@@ -133,7 +149,6 @@ export function createBot(customToken?: string): Bot {
             reply_to_message_id: ctx.message.message_id,
           });
         } catch (streamError: unknown) {
-          // Automated fallback if Telegram sendVideo by URL fails (>20 MB limit or Telegram fetch issue)
           console.warn(
             `[Bot] sendVideo failed for ${resolved.platform} (${url}), sending inline button fallback:`,
             streamError instanceof Error ? streamError.message : streamError
@@ -143,7 +158,7 @@ export function createBot(customToken?: string): Bot {
             `🎬 <b>Видео готово!</b>\n\n` +
             `${caption}\n\n` +
             `⚠️ <i>Размер файла превышает лимит прямого стриминга Telegram (20 МБ) или сервер Telegram временно ограничен.</i>\n\n` +
-            `Нажмите кнопку ниже, чтобы открыть или скачать видео в оригинальном качестве без сжатия:`;
+            `Нажмите кнопку ниже, чтобы открыть или скачать видео в оригинальном качестве:`;
 
           await ctx.reply(fallbackMessage, {
             reply_markup: keyboard,

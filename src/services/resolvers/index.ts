@@ -1,6 +1,19 @@
 import { ResolvedVideo, ResolverError, VideoResolver } from '../../types/resolver.js';
 import { TikTokResolver, TIKTOK_URL_REGEX } from './tiktok.js';
-import { InstagramResolver, INSTAGRAM_URL_REGEX, YouTubeResolver, YOUTUBE_SHORTS_REGEX } from './cobalt.js';
+import {
+  InstagramResolver,
+  INSTAGRAM_URL_REGEX,
+  YouTubeResolver,
+  YOUTUBE_SHORTS_REGEX,
+  TwitterResolver,
+  TWITTER_URL_REGEX,
+  RedditResolver,
+  REDDIT_URL_REGEX,
+  ThreadsResolver,
+  THREADS_URL_REGEX,
+  PinterestResolver,
+  PINTEREST_URL_REGEX,
+} from './cobalt.js';
 
 export class ResolverRegistry {
   private resolvers: VideoResolver[] = [];
@@ -10,6 +23,10 @@ export class ResolverRegistry {
     this.register(new TikTokResolver());
     this.register(new InstagramResolver());
     this.register(new YouTubeResolver());
+    this.register(new TwitterResolver());
+    this.register(new RedditResolver());
+    this.register(new ThreadsResolver());
+    this.register(new PinterestResolver());
   }
 
   register(resolver: VideoResolver): void {
@@ -24,8 +41,8 @@ export class ResolverRegistry {
     const resolver = this.findResolver(url);
     if (!resolver) {
       throw new ResolverError(
-        'Unsupported video URL. Only TikTok, Instagram Reels, and YouTube Shorts are supported.',
-        'tiktok', // fallback platform
+        'Unsupported video URL. Supported: TikTok, Instagram, YouTube Shorts, Twitter/X, Reddit, Threads, Pinterest.',
+        'tiktok',
         'UNSUPPORTED'
       );
     }
@@ -45,18 +62,20 @@ export const defaultRegistry = new ResolverRegistry();
  * Extracts URLs from message text that match our supported platforms.
  */
 export function extractSupportedUrls(text: string): string[] {
-  // Regex to match any http/https URL in text
   const urlRegex = /(https?:\/\/[^\s<>"{}|\\^`]+)/gi;
   const matches = text.match(urlRegex) || [];
 
   const supportedUrls: string[] = [];
   for (const match of matches) {
-    // Clean trailing punctuation commonly attached in chat messages (e.g., "Check this https://...!")
     const cleaned = match.replace(/[),.;:!?]+$/, '');
     if (
       TIKTOK_URL_REGEX.test(cleaned) ||
       INSTAGRAM_URL_REGEX.test(cleaned) ||
-      YOUTUBE_SHORTS_REGEX.test(cleaned)
+      YOUTUBE_SHORTS_REGEX.test(cleaned) ||
+      TWITTER_URL_REGEX.test(cleaned) ||
+      REDDIT_URL_REGEX.test(cleaned) ||
+      THREADS_URL_REGEX.test(cleaned) ||
+      PINTEREST_URL_REGEX.test(cleaned)
     ) {
       supportedUrls.push(cleaned);
     }

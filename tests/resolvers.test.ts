@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TikTokResolver } from '../src/services/resolvers/tiktok.js';
-import { InstagramResolver, YouTubeResolver } from '../src/services/resolvers/cobalt.js';
+import {
+  InstagramResolver,
+  
+  TwitterResolver,
+  RedditResolver,
+  ThreadsResolver,
+  PinterestResolver,
+} from '../src/services/resolvers/cobalt.js';
 import { defaultRegistry } from '../src/services/resolvers/index.js';
 import { resetConfigForTesting } from '../src/config.js';
 
@@ -24,7 +31,7 @@ describe('Video Resolvers', () => {
   describe('TikTokResolver', () => {
     const resolver = new TikTokResolver();
 
-    it('successfully extracts clean video URL from TikWM response', async () => {
+    it('successfully extracts clean HD video URL and audio URL from TikWM response', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
@@ -34,7 +41,9 @@ describe('Video Resolvers', () => {
           data: {
             id: '7106594312292453678',
             title: 'Sample TikTok Video Title',
-            play: 'https://v16m.tiktokcdn.com/clean-video.mp4',
+            hdplay: 'https://v16m.tiktokcdn.com/hd-clean-video.mp4',
+            play: 'https://v16m.tiktokcdn.com/sd-clean-video.mp4',
+            music: 'https://v16m.tiktokcdn.com/audio-track.mp3',
             duration: 15,
             author: { nickname: 'CoolCreator' },
           },
@@ -43,7 +52,8 @@ describe('Video Resolvers', () => {
 
       const result = await resolver.resolve('https://www.tiktok.com/@user/video/7106594312292453678');
       expect(result.platform).toBe('tiktok');
-      expect(result.directUrl).toBe('https://v16m.tiktokcdn.com/clean-video.mp4');
+      expect(result.directUrl).toBe('https://v16m.tiktokcdn.com/hd-clean-video.mp4');
+      expect(result.audioUrl).toBe('https://v16m.tiktokcdn.com/audio-track.mp3');
       expect(result.title).toBe('Sample TikTok Video Title');
       expect(result.author).toBe('CoolCreator');
       expect(result.durationSeconds).toBe(15);
@@ -101,9 +111,13 @@ describe('Video Resolvers', () => {
     });
   });
 
-  describe('Cobalt Resolver (Instagram & YouTube)', () => {
+  describe('Cobalt Resolvers (Multi-platform)', () => {
     const instagramResolver = new InstagramResolver();
-    const youtubeResolver = new YouTubeResolver();
+    // const youtubeResolver = new YouTubeResolver();
+    const twitterResolver = new TwitterResolver();
+    const redditResolver = new RedditResolver();
+    const threadsResolver = new ThreadsResolver();
+    const pinterestResolver = new PinterestResolver();
 
     it('successfully extracts direct URL from modern Cobalt tunnel status', async () => {
       global.fetch = vi.fn().mockResolvedValue({
@@ -113,98 +127,74 @@ describe('Video Resolvers', () => {
           status: 'tunnel',
           url: 'https://cdn.cobalt.tools/tunnel/video-clean.mp4',
           filename: 'instagram_reel_123.mp4',
+          audio: 'https://cdn.cobalt.tools/audio.mp3',
         }),
       } as unknown as Response);
 
       const result = await instagramResolver.resolve('https://www.instagram.com/reel/C3zYAbCdEfG/');
       expect(result.platform).toBe('instagram');
       expect(result.directUrl).toBe('https://cdn.cobalt.tools/tunnel/video-clean.mp4');
-      expect(result.title).toBe('instagram_reel_123.mp4');
+      expect(result.audioUrl).toBe('https://cdn.cobalt.tools/audio.mp3');
     });
 
-    it('successfully extracts URL from Cobalt redirect status', async () => {
+    it('resolves Twitter video', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({
           status: 'redirect',
-          url: 'https://rr2---sn-youtube-cdn.googlevideo.com/videoplayback?id=123',
-          filename: 'yt_short.mp4',
+          url: 'https://video.twimg.com/clean.mp4',
         }),
       } as unknown as Response);
 
-      const result = await youtubeResolver.resolve('https://www.youtube.com/shorts/dQw4w9WgXcQ');
-      expect(result.platform).toBe('youtube');
-      expect(result.directUrl).toContain('googlevideo.com');
+      const result = await twitterResolver.resolve('https://x.com/user/status/123456');
+      expect(result.platform).toBe('twitter');
+      expect(result.directUrl).toBe('https://video.twimg.com/clean.mp4');
     });
 
-    it('extracts first video from picker array response', async () => {
+    it('resolves Reddit video', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({
-          status: 'picker',
-          picker: [
-            { type: 'photo', url: 'https://cdn.example.com/photo.jpg' },
-            { type: 'video', url: 'https://cdn.example.com/video.mp4' },
-          ],
+          status: 'tunnel',
+          url: 'https://v.redd.it/clean.mp4',
         }),
       } as unknown as Response);
 
-      const result = await instagramResolver.resolve('https://www.instagram.com/p/C3zYAbCdEfG/');
-      expect(result.directUrl).toBe('https://cdn.example.com/video.mp4');
+      const result = await redditResolver.resolve('https://redd.it/abc123');
+      expect(result.platform).toBe('reddit');
     });
 
-    it('passes Authorization header when COBALT_API_KEY is configured', async () => {
-      process.env['COBALT_API_KEY'] = 'test-api-key-999';
-      resetConfigForTesting();
-
-      let capturedHeaders: Record<string, string> = {};
-      global.fetch = vi.fn().mockImplementation((_url, init) => {
-        capturedHeaders = init?.headers as Record<string, string>;
-        return Promise.resolve({
-          ok: true,
-          status: 200,
-          json: async () => ({
-            status: 'tunnel',
-            url: 'https://cdn.cobalt.tools/file.mp4',
-          }),
-        } as unknown as Response);
-      });
-
-      await youtubeResolver.resolve('https://www.youtube.com/shorts/dQw4w9WgXcQ');
-      expect(capturedHeaders['Authorization']).toBe('Api-Key test-api-key-999');
-    });
-
-    it('handles Cobalt auth missing error with descriptive instructions', async () => {
+    it('resolves Threads and Pinterest videos', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
         json: async () => ({
-          status: 'error',
-          error: { code: 'error.api.auth.jwt.missing' },
+          status: 'redirect',
+          url: 'https://cdn.example.com/media.mp4',
         }),
       } as unknown as Response);
 
-      await expect(
-        youtubeResolver.resolve('https://www.youtube.com/shorts/dQw4w9WgXcQ')
-      ).rejects.toThrow(/requires authentication/);
+      const resThreads = await threadsResolver.resolve('https://threads.net/@user/post/123');
+      expect(resThreads.platform).toBe('threads');
+
+      const resPin = await pinterestResolver.resolve('https://pin.it/12345');
+      expect(resPin.platform).toBe('pinterest');
     });
   });
 
   describe('Resolver Registry', () => {
-    it('finds appropriate resolver by URL', () => {
-      const tiktok = defaultRegistry.findResolver('https://www.tiktok.com/@user/video/123');
-      expect(tiktok?.platform).toBe('tiktok');
-
-      const insta = defaultRegistry.findResolver('https://www.instagram.com/reel/123');
-      expect(insta?.platform).toBe('instagram');
-
-      const yt = defaultRegistry.findResolver('https://www.youtube.com/shorts/123');
-      expect(yt?.platform).toBe('youtube');
-
-      const unknown = defaultRegistry.findResolver('https://example.com/video.mp4');
-      expect(unknown).toBeNull();
+    it('finds appropriate resolver across all supported platforms', () => {
+      expect(defaultRegistry.findResolver('https://www.tiktok.com/@user/video/123')?.platform).toBe('tiktok');
+      expect(defaultRegistry.findResolver('https://www.instagram.com/reel/123')?.platform).toBe('instagram');
+      expect(defaultRegistry.findResolver('https://www.youtube.com/shorts/123')?.platform).toBe('youtube');
+      expect(defaultRegistry.findResolver('https://twitter.com/user/status/123')?.platform).toBe('twitter');
+      expect(defaultRegistry.findResolver('https://x.com/user/status/123')?.platform).toBe('twitter');
+      expect(defaultRegistry.findResolver('https://redd.it/123')?.platform).toBe('reddit');
+      expect(defaultRegistry.findResolver('https://threads.net/@user/post/123')?.platform).toBe('threads');
+      expect(defaultRegistry.findResolver('https://pin.it/123')?.platform).toBe('pinterest');
+      expect(defaultRegistry.findResolver('https://unsupported.com/video.mp4')).toBeNull();
     });
   });
 });

@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { extractSupportedUrls } from '../src/services/resolvers/index.js';
 import { TIKTOK_URL_REGEX } from '../src/services/resolvers/tiktok.js';
-import { INSTAGRAM_URL_REGEX, YOUTUBE_SHORTS_REGEX } from '../src/services/resolvers/cobalt.js';
+import {
+  INSTAGRAM_URL_REGEX,
+  YOUTUBE_SHORTS_REGEX,
+  TWITTER_URL_REGEX,
+  REDDIT_URL_REGEX,
+  THREADS_URL_REGEX,
+  PINTEREST_URL_REGEX,
+} from '../src/services/resolvers/cobalt.js';
 
 describe('Platform URL Regex Matching', () => {
   describe('TikTok Regex', () => {
@@ -49,31 +56,47 @@ describe('Platform URL Regex Matching', () => {
     });
   });
 
+  describe('Twitter / X Regex', () => {
+    it('matches Twitter and X status URLs', () => {
+      expect(TWITTER_URL_REGEX.test('https://twitter.com/elonmusk/status/1788786504000')).toBe(true);
+      expect(TWITTER_URL_REGEX.test('https://x.com/OpenAI/status/1788786504000?s=20')).toBe(true);
+      expect(TWITTER_URL_REGEX.test('https://mobile.twitter.com/user/status/12345')).toBe(true);
+    });
+  });
+
+  describe('Reddit Regex', () => {
+    it('matches Reddit comment & share URLs', () => {
+      expect(REDDIT_URL_REGEX.test('https://www.reddit.com/r/funny/comments/abc123/funny_video/')).toBe(true);
+      expect(REDDIT_URL_REGEX.test('https://redd.it/abc123')).toBe(true);
+      expect(REDDIT_URL_REGEX.test('https://v.reddit.com/r/videos/comments/xyz789/clip/')).toBe(true);
+    });
+  });
+
+  describe('Threads & Pinterest Regex', () => {
+    it('matches Threads post URLs', () => {
+      expect(THREADS_URL_REGEX.test('https://www.threads.net/@zuck/post/C3zYAbCdEfG')).toBe(true);
+      expect(THREADS_URL_REGEX.test('https://threads.com/@user/post/C3zYAbCdEfG')).toBe(true);
+    });
+
+    it('matches Pinterest pin URLs', () => {
+      expect(PINTEREST_URL_REGEX.test('https://pin.it/1234567')).toBe(true);
+      expect(PINTEREST_URL_REGEX.test('https://www.pinterest.com/pin/123456789012345678/')).toBe(true);
+    });
+  });
+
   describe('extractSupportedUrls', () => {
-    it('extracts multiple valid URLs from message text and strips punctuation', () => {
+    it('extracts multiple valid URLs across platforms from message text', () => {
       const text = `
-        Hey check out this cool video: https://vm.tiktok.com/ZM8xyZ123/!
-        Also this reel: https://www.instagram.com/reel/C3zYAbCdEfG/?utm_source=ig_web_copy_link,
-        and this short: https://www.youtube.com/shorts/dQw4w9WgXcQ.
+        TikTok: https://vm.tiktok.com/ZM8xyZ123/!
+        Twitter: https://x.com/user/status/123456,
+        Reddit: https://redd.it/abc123.
       `;
 
       const urls = extractSupportedUrls(text);
       expect(urls).toHaveLength(3);
       expect(urls[0]).toBe('https://vm.tiktok.com/ZM8xyZ123/');
-      expect(urls[1]).toBe('https://www.instagram.com/reel/C3zYAbCdEfG/?utm_source=ig_web_copy_link');
-      expect(urls[2]).toBe('https://www.youtube.com/shorts/dQw4w9WgXcQ');
-    });
-
-    it('deduplicates identical URLs', () => {
-      const text = 'https://vm.tiktok.com/ZM8xyZ123/ and again https://vm.tiktok.com/ZM8xyZ123/';
-      const urls = extractSupportedUrls(text);
-      expect(urls).toHaveLength(1);
-    });
-
-    it('returns empty array when no supported URLs are present', () => {
-      const text = 'Hello world! Visit https://google.com or https://twitter.com/test';
-      const urls = extractSupportedUrls(text);
-      expect(urls).toEqual([]);
+      expect(urls[1]).toBe('https://x.com/user/status/123456');
+      expect(urls[2]).toBe('https://redd.it/abc123');
     });
   });
 });

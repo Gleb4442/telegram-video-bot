@@ -119,7 +119,7 @@ describe('Bot Handlers and Utilities', () => {
         },
       });
 
-      expect(sentMessage).toContain('Добро пожаловать в Video Downloader');
+      expect(sentMessage).toContain('Добро пожаловать в Universal Media Downloader');
       expect(sentMessage).toContain('TikTok');
       expect(sentMessage).toContain('Instagram');
       expect(sentMessage).toContain('YouTube Shorts');
