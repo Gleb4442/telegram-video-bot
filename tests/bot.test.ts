@@ -1,8 +1,37 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { User, UserFromGetMe } from 'grammy/types';
 import { createBot, escapeHtml, formatCaption } from '../src/bot.js';
 import { ResolvedVideo, ResolverError } from '../src/types/resolver.js';
 import * as resolverModule from '../src/services/resolvers/index.js';
 import { resetConfigForTesting } from '../src/config.js';
+
+const mockBotInfo: UserFromGetMe = {
+  id: 1234567890,
+  is_bot: true,
+  first_name: 'VideoDownloaderBot',
+  username: 'VideoDownloaderBot',
+  can_join_groups: true,
+  can_read_all_group_messages: false,
+  supports_inline_queries: false,
+  can_connect_to_business: false,
+  has_main_web_app: false,
+  has_topics_enabled: false,
+  allows_users_to_create_topics: false,
+  can_manage_bots: false,
+  supports_join_request_queries: false,
+};
+
+const mockUser: User = {
+  id: 42,
+  is_bot: false,
+  first_name: 'Tester',
+};
+
+const mockPrivateChat = {
+  id: 42,
+  type: 'private' as const,
+  first_name: 'Tester',
+};
 
 describe('Bot Handlers and Utilities', () => {
   beforeEach(() => {
@@ -68,23 +97,13 @@ describe('Bot Handlers and Utilities', () => {
   describe('Bot Update Processing & Fallback Flow', () => {
     it('handles /start command with informative greeting', async () => {
       const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
-      bot.botInfo = {
-        id: 1234567890,
-        is_bot: true,
-        first_name: 'VideoDownloaderBot',
-        username: 'VideoDownloaderBot',
-        can_join_groups: true,
-        can_read_all_group_messages: false,
-        supports_inline_queries: false,
-        can_connect_to_business: false,
-        has_main_web_app: false,
-      };
+      bot.botInfo = mockBotInfo;
 
       let sentMessage = '';
       bot.api.config.use((_prev, method, payload: any) => {
         if (method === 'sendMessage') {
           sentMessage = payload.text;
-          return { ok: true, result: { message_id: 101, date: 1, chat: { id: 42, type: 'private' }, text: payload.text } } as any;
+          return { ok: true, result: { message_id: 101, date: 1, chat: mockPrivateChat, from: mockUser, text: payload.text } } as any;
         }
         return { ok: true, result: true } as any;
       });
@@ -94,7 +113,8 @@ describe('Bot Handlers and Utilities', () => {
         message: {
           message_id: 1,
           date: 1,
-          chat: { id: 42, type: 'private' },
+          chat: mockPrivateChat,
+          from: mockUser,
           text: '/start',
           entities: [{ type: 'bot_command', offset: 0, length: 6 }],
         },
@@ -108,23 +128,13 @@ describe('Bot Handlers and Utilities', () => {
 
     it('handles /help command with instructions', async () => {
       const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
-      bot.botInfo = {
-        id: 1234567890,
-        is_bot: true,
-        first_name: 'VideoDownloaderBot',
-        username: 'VideoDownloaderBot',
-        can_join_groups: true,
-        can_read_all_group_messages: false,
-        supports_inline_queries: false,
-        can_connect_to_business: false,
-        has_main_web_app: false,
-      };
+      bot.botInfo = mockBotInfo;
 
       let sentMessage = '';
       bot.api.config.use((_prev, method, payload: any) => {
         if (method === 'sendMessage') {
           sentMessage = payload.text;
-          return { ok: true, result: { message_id: 101, date: 1, chat: { id: 42, type: 'private' }, text: payload.text } } as any;
+          return { ok: true, result: { message_id: 101, date: 1, chat: mockPrivateChat, from: mockUser, text: payload.text } } as any;
         }
         return { ok: true, result: true } as any;
       });
@@ -134,7 +144,8 @@ describe('Bot Handlers and Utilities', () => {
         message: {
           message_id: 1,
           date: 1,
-          chat: { id: 42, type: 'private' },
+          chat: mockPrivateChat,
+          from: mockUser,
           text: '/help',
           entities: [{ type: 'bot_command', offset: 0, length: 5 }],
         },
@@ -148,17 +159,7 @@ describe('Bot Handlers and Utilities', () => {
 
     it('sends direct video when resolution succeeds and Telegram accepts video', async () => {
       const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
-      bot.botInfo = {
-        id: 1234567890,
-        is_bot: true,
-        first_name: 'VideoDownloaderBot',
-        username: 'VideoDownloaderBot',
-        can_join_groups: true,
-        can_read_all_group_messages: false,
-        supports_inline_queries: false,
-        can_connect_to_business: false,
-        has_main_web_app: false,
-      };
+      bot.botInfo = mockBotInfo;
 
       vi.spyOn(resolverModule, 'resolveVideo').mockResolvedValue({
         platform: 'tiktok',
@@ -177,7 +178,7 @@ describe('Bot Handlers and Utilities', () => {
         }
         if (method === 'sendVideo') {
           sentVideoUrl = payload.video;
-          return { ok: true, result: { message_id: 102, date: 1, chat: { id: 42, type: 'private' } } } as any;
+          return { ok: true, result: { message_id: 102, date: 1, chat: mockPrivateChat, from: mockUser } } as any;
         }
         return { ok: true, result: true } as any;
       });
@@ -187,7 +188,8 @@ describe('Bot Handlers and Utilities', () => {
         message: {
           message_id: 2,
           date: 1,
-          chat: { id: 42, type: 'private' },
+          chat: mockPrivateChat,
+          from: mockUser,
           text: 'Check this: https://vm.tiktok.com/ZM8xyZ123/',
         },
       });
@@ -198,17 +200,7 @@ describe('Bot Handlers and Utilities', () => {
 
     it('falls back to inline download button when Telegram sendVideo fails (>20MB limit)', async () => {
       const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
-      bot.botInfo = {
-        id: 1234567890,
-        is_bot: true,
-        first_name: 'VideoDownloaderBot',
-        username: 'VideoDownloaderBot',
-        can_join_groups: true,
-        can_read_all_group_messages: false,
-        supports_inline_queries: false,
-        can_connect_to_business: false,
-        has_main_web_app: false,
-      };
+      bot.botInfo = mockBotInfo;
 
       vi.spyOn(resolverModule, 'resolveVideo').mockResolvedValue({
         platform: 'youtube',
@@ -230,7 +222,7 @@ describe('Bot Handlers and Utilities', () => {
         if (method === 'sendMessage') {
           fallbackText = payload.text;
           inlineKeyboardButtons = payload.reply_markup;
-          return { ok: true, result: { message_id: 103, date: 1, chat: { id: 42, type: 'private' }, text: payload.text } } as any;
+          return { ok: true, result: { message_id: 103, date: 1, chat: mockPrivateChat, from: mockUser, text: payload.text } } as any;
         }
         return { ok: true, result: true } as any;
       });
@@ -240,7 +232,8 @@ describe('Bot Handlers and Utilities', () => {
         message: {
           message_id: 3,
           date: 1,
-          chat: { id: 42, type: 'private' },
+          chat: mockPrivateChat,
+          from: mockUser,
           text: 'https://www.youtube.com/shorts/dQw4w9WgXcQ',
         },
       });
@@ -254,17 +247,7 @@ describe('Bot Handlers and Utilities', () => {
 
     it('sends polite error message when video is private or deleted', async () => {
       const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
-      bot.botInfo = {
-        id: 1234567890,
-        is_bot: true,
-        first_name: 'VideoDownloaderBot',
-        username: 'VideoDownloaderBot',
-        can_join_groups: true,
-        can_read_all_group_messages: false,
-        supports_inline_queries: false,
-        can_connect_to_business: false,
-        has_main_web_app: false,
-      };
+      bot.botInfo = mockBotInfo;
 
       vi.spyOn(resolverModule, 'resolveVideo').mockRejectedValue(
         new ResolverError('Video is private', 'instagram', 'PRIVATE_OR_DELETED')
@@ -274,7 +257,7 @@ describe('Bot Handlers and Utilities', () => {
       bot.api.config.use((_prev, method, payload: any) => {
         if (method === 'sendMessage') {
           errorMessage = payload.text;
-          return { ok: true, result: { message_id: 104, date: 1, chat: { id: 42, type: 'private' }, text: payload.text } } as any;
+          return { ok: true, result: { message_id: 104, date: 1, chat: mockPrivateChat, from: mockUser, text: payload.text } } as any;
         }
         return { ok: true, result: true } as any;
       });
@@ -284,7 +267,8 @@ describe('Bot Handlers and Utilities', () => {
         message: {
           message_id: 4,
           date: 1,
-          chat: { id: 42, type: 'private' },
+          chat: mockPrivateChat,
+          from: mockUser,
           text: 'https://www.instagram.com/reel/PrivateVideo/',
         },
       });

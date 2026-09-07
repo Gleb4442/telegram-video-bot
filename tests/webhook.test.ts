@@ -16,7 +16,7 @@ describe('Webhook Security & Handler', () => {
       const res = await GET(req);
       expect(res.status).toBe(200);
 
-      const data = await res.json();
+      const data = (await res.json()) as { status: string; service: string };
       expect(data.status).toBe('healthy');
       expect(data.service).toBe('telegram-video-bot-webhook');
     });
@@ -40,7 +40,7 @@ describe('Webhook Security & Handler', () => {
       const res = await POST(req);
       expect(res.status).toBe(401);
 
-      const json = await res.json();
+      const json = (await res.json()) as { error: string };
       expect(json.error).toContain('Unauthorized');
     });
 
