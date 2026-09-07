@@ -1,23 +1,44 @@
 import { Bot, GrammyError, HttpError, InlineKeyboard, InlineQueryResultBuilder, InputMediaBuilder } from 'grammy';
+import { UserFromGetMe } from 'grammy/types';
 import { getConfig } from './config.js';
 import { extractSupportedUrls, resolveVideo } from './services/resolvers/index.js';
 import { ResolvedVideo, ResolverError, SupportedPlatform } from './types/resolver.js';
 
 export interface UserPreferences {
-  cleanMode: boolean; // if true, send video without title/author caption
+  cleanMode: boolean; // true = omit text caption
+  asDocument: boolean; // true = send as raw document to bypass Telegram player compression
 }
 
 // In-memory cache for user preferences
 const userPrefsMap = new Map<number, UserPreferences>();
 
 export function getUserPreferences(userId: number): UserPreferences {
-  return userPrefsMap.get(userId) || { cleanMode: false };
+  return userPrefsMap.get(userId) || { cleanMode: false, asDocument: false };
 }
 
 export function setUserPreferences(userId: number, prefs: Partial<UserPreferences>): void {
   const current = getUserPreferences(userId);
   userPrefsMap.set(userId, { ...current, ...prefs });
 }
+
+/**
+ * Static bot info to eliminate Telegram API getMe round-trip on Vercel cold starts.
+ */
+export const defaultBotInfo: UserFromGetMe = {
+  id: 8894030664,
+  is_bot: true,
+  first_name: 'TRS bot',
+  username: 'trsdownloadbot',
+  can_join_groups: true,
+  can_read_all_group_messages: false,
+  supports_inline_queries: true,
+  can_connect_to_business: false,
+  has_main_web_app: false,
+  has_topics_enabled: false,
+  allows_users_to_create_topics: false,
+  can_manage_bots: false,
+  supports_join_request_queries: false,
+};
 
 /**
  * Escapes special HTML characters for Telegram HTML parse mode.
@@ -63,9 +84,12 @@ export function formatCaption(video: ResolvedVideo): string {
 /**
  * Factory function to create and configure the grammY Bot instance.
  */
-export function createBot(customToken?: string): Bot {
+export function createBot(customToken?: string, customBotInfo?: UserFromGetMe): Bot {
   const token = customToken || getConfig().TELEGRAM_BOT_TOKEN;
-  const bot = new Bot(token);
+  const botInfo = customBotInfo || defaultBotInfo;
+
+  // Initializing with static botInfo completely avoids the getMe cold-start delay
+  const bot = new Bot(token, { botInfo });
 
   // Global error handler to prevent crashing
   bot.catch((err) => {
@@ -87,7 +111,7 @@ export function createBot(customToken?: string): Bot {
     const welcomeText =
       `👋 <b>Добро пожаловать в Universal Media Downloader!</b>\n\n` +
       `Я скачиваю видео и фото-карусели <b>в максимальном HD-качестве без водяных знаков</b> из:\n` +
-      `• 🎵 <b>TikTok</b> (видео, фото-слайдшоу, музыка)\n` +
+      `• 🎵 <b>TikTok</b> (Full HD 1080p + аудио)\n` +
       `• 📸 <b>Instagram</b> (Reels, посты, карусели фото)\n` +
       `• ▶️ <b>YouTube Shorts</b>\n` +
       `• 𝕏 <b>Twitter / X</b>\n` +
@@ -96,7 +120,7 @@ export function createBot(customToken?: string): Bot {
       `• 📌 <b>Pinterest</b>\n\n` +
       `🚀 <b>Как пользоваться:</b>\n` +
       `Просто отправьте или перешлите мне ссылку на любое видео или альбом.\n\n` +
-      `⚙️ Настроить режим отображения: /settings`;
+      `⚙️ Настроить режим отправки (видео / файл без сжатия): /settings`;
 
     await ctx.reply(welcomeText, { parse_mode: 'HTML' });
   });
@@ -106,7 +130,7 @@ export function createBot(customToken?: string): Bot {
     const helpText =
       `📖 <b>Поддерживаемые платформы</b>\n\n` +
       `Отправьте ссылку одного из следующих форматов:\n\n` +
-      `• 🎵 <b>TikTok:</b> tiktok.com / vm.tiktok.com / vt.tiktok.com (видео и слайдшоу)\n` +
+      `• 🎵 <b>TikTok:</b> tiktok.com / vm.tiktok.com / vt.tiktok.com (Full HD)\n` +
       `• 📸 <b>Instagram:</b> instagram.com/reel/... или /p/... (Reels и карусели)\n` +
       `• ▶️ <b>YouTube Shorts:</b> youtube.com/shorts/... или youtu.be/...\n` +
       `• 𝕏 <b>Twitter / X:</b> twitter.com/... или x.com/...\n` +
@@ -125,33 +149,57 @@ export function createBot(customToken?: string): Bot {
     const prefs = getUserPreferences(userId);
 
     const keyboard = new InlineKeyboard()
-      .text(prefs.cleanMode ? '✅ Только чистое видео (без текста)' : '⚪ Только чистое видео (без текста)', 'pref_clean')
+      .text(
+        prefs.asDocument ? '📁 Формат: Документ (без сжатия)' : '🎬 Формат: Видео (плеер)',
+        'pref_toggle_doc'
+      )
       .row()
-      .text(!prefs.cleanMode ? '✅ С описанием и автором' : '⚪ С описанием и автором', 'pref_caption');
+      .text(
+        prefs.cleanMode ? '✂️ Подпись: Выключена (чистое видео)' : '📝 Подпись: Включена (с автором)',
+        'pref_toggle_caption'
+      );
 
     await ctx.reply(
       `⚙️ <b>Настройки скачивания:</b>\n\n` +
-      `Выберите, как бот должен присылать медиа:\n\n` +
-      `• <b>Только чистое видео:</b> ролик без лишних подписей — удобно сразу сохранять в галерею или пересылать.\n` +
-      `• <b>С описанием:</b> добавляется платформа, название и автор.`,
+      `<b>1. Формат отправки:</b>\n` +
+      `• <i>Видео (плеер):</i> проигрывается сразу в чате Telegram.\n` +
+      `• <i>Документ (файл):</i> файл без малейшего сжатия Telegram (100% оригинальный битрейт).\n\n` +
+      `<b>2. Описание:</b>\n` +
+      `• <i>Выключено:</i> только чистый файл без текста.\n` +
+      `• <i>Включено:</i> добавляется название и автор.\n\n` +
+      `<i>Нажмите на кнопку ниже для переключения:</i>`,
       { parse_mode: 'HTML', reply_markup: keyboard }
     );
   });
 
-  // Settings toggle callback query
-  bot.callbackQuery(['pref_clean', 'pref_caption'], async (ctx) => {
+  // Settings toggle callback queries
+  bot.callbackQuery(['pref_toggle_doc', 'pref_toggle_caption'], async (ctx) => {
     const userId = ctx.from.id;
-    const isClean = ctx.callbackQuery.data === 'pref_clean';
-    setUserPreferences(userId, { cleanMode: isClean });
+    const current = getUserPreferences(userId);
 
+    if (ctx.callbackQuery.data === 'pref_toggle_doc') {
+      const newAsDoc = !current.asDocument;
+      setUserPreferences(userId, { asDocument: newAsDoc });
+    } else if (ctx.callbackQuery.data === 'pref_toggle_caption') {
+      const newClean = !current.cleanMode;
+      setUserPreferences(userId, { cleanMode: newClean });
+    }
+
+    const updated = getUserPreferences(userId);
     const keyboard = new InlineKeyboard()
-      .text(isClean ? '✅ Только чистое видео (без текста)' : '⚪ Только чистое видео (без текста)', 'pref_clean')
+      .text(
+        updated.asDocument ? '📁 Формат: Документ (без сжатия)' : '🎬 Формат: Видео (плеер)',
+        'pref_toggle_doc'
+      )
       .row()
-      .text(!isClean ? '✅ С описанием и автором' : '⚪ С описанием и автором', 'pref_caption');
+      .text(
+        updated.cleanMode ? '✂️ Подпись: Выключена (чистое видео)' : '📝 Подпись: Включена (с автором)',
+        'pref_toggle_caption'
+      );
 
     await ctx.editMessageReplyMarkup({ reply_markup: keyboard }).catch(() => {});
     await ctx.answerCallbackQuery({
-      text: isClean ? 'Режим: Только чистое видео' : 'Режим: С описанием и автором',
+      text: 'Настройки обновлены!',
     });
   });
 
@@ -222,13 +270,12 @@ export function createBot(customToken?: string): Bot {
 
     for (const url of targetUrls) {
       try {
-        await ctx.replyWithChatAction('upload_video');
-      } catch (e) {
-        console.warn('[Bot] Failed to send chat action:', e);
-      }
+        // Optimized: Run typing action and link resolution IN PARALLEL
+        const [_, resolved] = await Promise.all([
+          ctx.replyWithChatAction('upload_video').catch(() => {}),
+          resolveVideo(url),
+        ]);
 
-      try {
-        const resolved = await resolveVideo(url);
         const caption = prefs.cleanMode ? undefined : formatCaption(resolved);
 
         // Case 1: Multi-item Album / Carousel (Instagram or TikTok photo slideshow)
@@ -272,16 +319,27 @@ export function createBot(customToken?: string): Bot {
         }
 
         try {
-          await ctx.replyWithVideo(resolved.directUrl, {
-            caption,
-            parse_mode: 'HTML',
-            supports_streaming: true,
-            reply_markup: keyboard,
-            reply_to_message_id: ctx.message.message_id,
-          });
+          // If user prefers raw uncompressed file format, send as document
+          if (prefs.asDocument) {
+            await ctx.replyWithDocument(resolved.directUrl, {
+              caption,
+              parse_mode: 'HTML',
+              reply_markup: keyboard,
+              reply_to_message_id: ctx.message.message_id,
+            });
+          } else {
+            // Send as streaming video with native player
+            await ctx.replyWithVideo(resolved.directUrl, {
+              caption,
+              parse_mode: 'HTML',
+              supports_streaming: true,
+              reply_markup: keyboard,
+              reply_to_message_id: ctx.message.message_id,
+            });
+          }
         } catch (streamError: unknown) {
           console.warn(
-            `[Bot] sendVideo failed for ${resolved.platform} (${url}), sending inline button fallback:`,
+            `[Bot] sendMedia failed for ${resolved.platform} (${url}), sending inline button fallback:`,
             streamError instanceof Error ? streamError.message : streamError
           );
 

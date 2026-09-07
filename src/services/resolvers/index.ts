@@ -1,4 +1,5 @@
 import { ResolvedVideo, ResolverError, VideoResolver } from '../../types/resolver.js';
+import { MemoryCache } from '../../utils/cache.js';
 import { TikTokResolver, TIKTOK_URL_REGEX } from './tiktok.js';
 import {
   InstagramResolver,
@@ -15,11 +16,13 @@ import {
   PINTEREST_URL_REGEX,
 } from './cobalt.js';
 
+// Global cache for resolved videos (TTL 30 minutes, max 500 items)
+export const videoCache = new MemoryCache<ResolvedVideo>(500, 30 * 60 * 1000);
+
 export class ResolverRegistry {
   private resolvers: VideoResolver[] = [];
 
   constructor() {
-    // Default resolvers in priority order
     this.register(new TikTokResolver());
     this.register(new InstagramResolver());
     this.register(new YouTubeResolver());
@@ -38,7 +41,15 @@ export class ResolverRegistry {
   }
 
   async resolve(url: string): Promise<ResolvedVideo> {
-    const resolver = this.findResolver(url);
+    const cleanUrl = url.trim();
+
+    // Check fast in-memory cache first to save Vercel execution time and avoid rate limits
+    const cached = videoCache.get(cleanUrl);
+    if (cached) {
+      return cached;
+    }
+
+    const resolver = this.findResolver(cleanUrl);
     if (!resolver) {
       throw new ResolverError(
         'Unsupported video URL. Supported: TikTok, Instagram, YouTube Shorts, Twitter/X, Reddit, Threads, Pinterest.',
@@ -47,7 +58,12 @@ export class ResolverRegistry {
       );
     }
 
-    return resolver.resolve(url);
+    const resolved = await resolver.resolve(cleanUrl);
+
+    // Store in cache
+    videoCache.set(cleanUrl, resolved);
+
+    return resolved;
   }
 
   getRegisteredResolvers(): readonly VideoResolver[] {

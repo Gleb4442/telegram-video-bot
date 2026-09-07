@@ -316,7 +316,7 @@ describe('Bot Handlers and Utilities', () => {
       expect(sentMediaGroup[0].type).toBe('photo');
       expect(sentMediaGroup[0].media).toBe('https://cdn.example.com/item1.jpg');
     });
-    it('handles /settings command and toggles clean mode via callback query', async () => {
+    it('handles /settings command and toggles clean mode and document format', async () => {
       const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
       bot.botInfo = mockBotInfo;
 
@@ -350,40 +350,54 @@ describe('Bot Handlers and Utilities', () => {
       });
 
       expect(settingsMessage).toContain('Настройки скачивания');
-      expect(replyMarkup?.inline_keyboard?.[0]?.[0]?.text).toContain('Только чистое видео');
+      expect(replyMarkup?.inline_keyboard?.[0]?.[0]?.text).toContain('Формат: Видео');
 
-      // Click callback query to enable cleanMode
+      // Click callback query to enable cleanMode (disable caption)
       await bot.handleUpdate({
         update_id: 7,
         callback_query: {
           id: 'cb_1',
           from: mockUser,
           message: { message_id: 106, date: 1, chat: mockPrivateChat },
-          data: 'pref_clean',
+          data: 'pref_toggle_caption',
           chat_instance: '123',
         },
       });
 
-      // Now send a video link: should be sent WITHOUT caption!
+      // Also click callback query to switch to document format
+      await bot.handleUpdate({
+        update_id: 8,
+        callback_query: {
+          id: 'cb_2',
+          from: mockUser,
+          message: { message_id: 106, date: 1, chat: mockPrivateChat },
+          data: 'pref_toggle_doc',
+          chat_instance: '123',
+        },
+      });
+
+      // Now send a video link: should be sent via sendDocument WITHOUT caption!
       vi.spyOn(resolverModule, 'resolveVideo').mockResolvedValue({
         platform: 'tiktok',
         directUrl: 'https://v16.tiktokcdn.com/clean.mp4',
         title: 'Video Title That Should Be Omitted in Clean Mode',
       });
 
-      let videoCaption: string | undefined = 'initial';
+      let sentAsDocument = false;
+      let documentCaption: string | undefined = 'initial';
       bot.api.config.use((_prev, method, payload: any) => {
-        if (method === 'sendVideo') {
-          videoCaption = payload.caption;
+        if (method === 'sendDocument') {
+          sentAsDocument = true;
+          documentCaption = payload.caption;
           return { ok: true, result: { message_id: 107, date: 1, chat: mockPrivateChat, from: mockUser } } as any;
         }
         return { ok: true, result: true } as any;
       });
 
       await bot.handleUpdate({
-        update_id: 8,
+        update_id: 9,
         message: {
-          message_id: 8,
+          message_id: 9,
           date: 1,
           chat: mockPrivateChat,
           from: mockUser,
@@ -391,7 +405,8 @@ describe('Bot Handlers and Utilities', () => {
         },
       });
 
-      expect(videoCaption).toBeUndefined();
+      expect(sentAsDocument).toBe(true);
+      expect(documentCaption).toBeUndefined();
     });
   });
 });

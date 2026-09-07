@@ -49,6 +49,7 @@ export class TikTokResolver implements VideoResolver {
 
     try {
       const endpoint = 'https://www.tikwm.com/api/';
+      // Passing hd: "1" forces TikWM to fetch the 1080p Full HD source stream
       const response = await fetchWithTimeout(endpoint, {
         method: 'POST',
         headers: {
@@ -57,7 +58,7 @@ export class TikTokResolver implements VideoResolver {
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
           Accept: 'application/json, text/javascript, */*; q=0.01',
         },
-        body: new URLSearchParams({ url: cleanUrl }),
+        body: new URLSearchParams({ url: cleanUrl, hd: '1' }),
         timeoutMs: 8000,
       });
 
