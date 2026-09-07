@@ -64,7 +64,6 @@ describe('Bot Handlers and Utilities', () => {
       expect(caption).toContain('🎵 TikTok');
       expect(caption).toContain('Hilarious Cat Jump &lt;Fail&gt;');
       expect(caption).toContain('@cat_lover');
-      expect(caption).toContain('without watermark');
     });
 
     it('formats Instagram Reel caption', () => {
@@ -75,7 +74,7 @@ describe('Bot Handlers and Utilities', () => {
       };
 
       const caption = formatCaption(video);
-      expect(caption).toContain('📸 Instagram Reel');
+      expect(caption).toContain('📸 Instagram');
       expect(caption).toContain('Sunset in Bali');
     });
 
@@ -88,7 +87,7 @@ describe('Bot Handlers and Utilities', () => {
       };
 
       const caption = formatCaption(video);
-      expect(caption).toContain('▶️ YouTube Short');
+      expect(caption).toContain('▶️ YouTube Shorts');
       expect(caption).toContain('...');
       expect(caption.length).toBeLessThan(400);
     });
@@ -120,7 +119,7 @@ describe('Bot Handlers and Utilities', () => {
         },
       });
 
-      expect(sentMessage).toContain('Welcome to the Short-Form Video Downloader');
+      expect(sentMessage).toContain('Добро пожаловать в Video Downloader');
       expect(sentMessage).toContain('TikTok');
       expect(sentMessage).toContain('Instagram');
       expect(sentMessage).toContain('YouTube Shorts');
@@ -151,13 +150,13 @@ describe('Bot Handlers and Utilities', () => {
         },
       });
 
-      expect(sentMessage).toContain('Help & Supported Platforms');
+      expect(sentMessage).toContain('Поддерживаемые платформы');
       expect(sentMessage).toContain('TikTok');
       expect(sentMessage).toContain('Instagram');
       expect(sentMessage).toContain('YouTube Shorts');
     });
 
-    it('sends direct video when resolution succeeds and Telegram accepts video', async () => {
+    it('sends direct video with streaming support when resolution succeeds', async () => {
       const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
       bot.botInfo = mockBotInfo;
 
@@ -170,6 +169,8 @@ describe('Bot Handlers and Utilities', () => {
 
       let sentVideoUrl = '';
       let chatActionSent = '';
+      let supportsStreaming = false;
+      let replyMarkup: any = null;
 
       bot.api.config.use((_prev, method, payload: any) => {
         if (method === 'sendChatAction') {
@@ -178,6 +179,8 @@ describe('Bot Handlers and Utilities', () => {
         }
         if (method === 'sendVideo') {
           sentVideoUrl = payload.video;
+          supportsStreaming = payload.supports_streaming;
+          replyMarkup = payload.reply_markup;
           return { ok: true, result: { message_id: 102, date: 1, chat: mockPrivateChat, from: mockUser } } as any;
         }
         return { ok: true, result: true } as any;
@@ -196,6 +199,8 @@ describe('Bot Handlers and Utilities', () => {
 
       expect(chatActionSent).toBe('upload_video');
       expect(sentVideoUrl).toBe('https://v16.tiktokcdn.com/clean-video.mp4');
+      expect(supportsStreaming).toBe(true);
+      expect(replyMarkup?.inline_keyboard?.[0]?.[0]?.text).toContain('Скачать в HD');
     });
 
     it('falls back to inline download button when Telegram sendVideo fails (>20MB limit)', async () => {
@@ -213,7 +218,6 @@ describe('Bot Handlers and Utilities', () => {
 
       bot.api.config.use((_prev, method, payload: any) => {
         if (method === 'sendVideo') {
-          // Simulate Telegram rejecting video > 20 MB or failing to fetch
           const error = new Error('400 Bad Request: failed to get HTTP URL content');
           (error as any).error_code = 400;
           (error as any).description = 'failed to get HTTP URL content';
@@ -238,11 +242,9 @@ describe('Bot Handlers and Utilities', () => {
         },
       });
 
-      expect(fallbackText).toContain('Telegram could not stream this video directly');
-      expect(fallbackText).toContain('20 MB URL limit');
+      expect(fallbackText).toContain('превышает лимит');
       expect(inlineKeyboardButtons).toBeDefined();
       expect(inlineKeyboardButtons.inline_keyboard[0][0].url).toBe('https://rr1---sn.googlevideo.com/large-video.mp4');
-      expect(inlineKeyboardButtons.inline_keyboard[0][0].text).toContain('Download Clean Video');
     });
 
     it('sends polite error message when video is private or deleted', async () => {
@@ -273,7 +275,7 @@ describe('Bot Handlers and Utilities', () => {
         },
       });
 
-      expect(errorMessage).toContain('This video appears to be private, region-restricted, or deleted');
+      expect(errorMessage).toContain('приватное');
     });
   });
 });

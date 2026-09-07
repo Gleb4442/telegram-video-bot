@@ -19,24 +19,21 @@ export function escapeHtml(text: string): string {
 export function formatCaption(video: ResolvedVideo): string {
   const platformIcons: Record<ResolvedVideo['platform'], string> = {
     tiktok: '🎵 TikTok',
-    instagram: '📸 Instagram Reel',
-    youtube: '▶️ YouTube Short',
+    instagram: '📸 Instagram',
+    youtube: '▶️ YouTube Shorts',
   };
 
   const lines: string[] = [];
   lines.push(`<b>${platformIcons[video.platform]}</b>`);
 
-  if (video.title) {
-    // Truncate title if excessively long for caption limits
-    const cleanTitle = video.title.length > 250 ? `${video.title.slice(0, 247)}...` : video.title;
+  if (video.title && !video.title.endsWith('.mp4')) {
+    const cleanTitle = video.title.length > 200 ? `${video.title.slice(0, 197)}...` : video.title;
     lines.push(`📌 <i>${escapeHtml(cleanTitle)}</i>`);
   }
 
   if (video.author) {
     lines.push(`👤 <i>@${escapeHtml(video.author)}</i>`);
   }
-
-  lines.push('✨ <i>Downloaded without watermark via @TeleVideoBot</i>');
 
   return lines.join('\n');
 }
@@ -66,14 +63,13 @@ export function createBot(customToken?: string): Bot {
   // /start command
   bot.command('start', async (ctx) => {
     const welcomeText =
-      `👋 <b>Welcome to the Short-Form Video Downloader!</b>\n\n` +
-      `I can download clean, high-quality videos <b>without watermarks</b> from:\n` +
-      `• <b>TikTok</b> (videos & music)\n` +
-      `• <b>Instagram Reels & Posts</b>\n` +
+      `👋 <b>Добро пожаловать в Video Downloader!</b>\n\n` +
+      `Я скачиваю видео <b>в максимальном HD качестве без водяных знаков</b> из:\n` +
+      `• <b>TikTok</b> (Full HD 1080p)\n` +
+      `• <b>Instagram Reels & посты</b>\n` +
       `• <b>YouTube Shorts</b>\n\n` +
-      `🚀 <b>How to use:</b>\n` +
-      `Simply paste and send any video link directly to this chat.\n\n` +
-      `ℹ️ <i>Note: Telegram limits direct video streaming via URL to 20 MB. If a video exceeds this limit, I will automatically provide a direct high-speed download link!</i>`;
+      `🚀 <b>Как пользоваться:</b>\n` +
+      `Просто отправьте или перешлите мне любую ссылку на видео.`;
 
     await ctx.reply(welcomeText, { parse_mode: 'HTML' });
   });
@@ -81,18 +77,12 @@ export function createBot(customToken?: string): Bot {
   // /help command
   bot.command('help', async (ctx) => {
     const helpText =
-      `📖 <b>Help & Supported Platforms</b>\n\n` +
-      `Send or forward a message containing one of these link formats:\n\n` +
-      `🎵 <b>TikTok:</b>\n` +
-      `• <code>https://www.tiktok.com/@user/video/...</code>\n` +
-      `• <code>https://vm.tiktok.com/...</code> or <code>https://vt.tiktok.com/...</code>\n\n` +
-      `📸 <b>Instagram:</b>\n` +
-      `• <code>https://www.instagram.com/reel/...</code>\n` +
-      `• <code>https://www.instagram.com/p/...</code>\n\n` +
-      `▶️ <b>YouTube Shorts:</b>\n` +
-      `• <code>https://www.youtube.com/shorts/...</code>\n` +
-      `• <code>https://youtu.be/...</code>\n\n` +
-      `⚡ All videos are resolved serverless and delivered directly to you.`;
+      `📖 <b>Поддерживаемые платформы</b>\n\n` +
+      `Отправьте ссылку одного из следующих форматов:\n\n` +
+      `🎵 <b>TikTok:</b> tiktok.com / vm.tiktok.com / vt.tiktok.com\n` +
+      `📸 <b>Instagram:</b> instagram.com/reel/... или /p/...\n` +
+      `▶️ <b>YouTube Shorts:</b> youtube.com/shorts/... или youtu.be/...\n\n` +
+      `⚡ Видео скачиваются без водяных знаков в наилучшем доступном разрешении.`;
 
     await ctx.reply(helpText, { parse_mode: 'HTML' });
   });
@@ -101,7 +91,6 @@ export function createBot(customToken?: string): Bot {
   bot.on('message:text', async (ctx) => {
     const text = ctx.message.text;
 
-    // Ignore commands (already handled above)
     if (text.startsWith('/')) {
       return;
     }
@@ -109,54 +98,52 @@ export function createBot(customToken?: string): Bot {
     const urls = extractSupportedUrls(text);
 
     if (urls.length === 0) {
-      // In private chats, give feedback if no supported URL was found
       if (ctx.chat.type === 'private') {
         await ctx.reply(
-          `🔍 No supported video link found in your message.\n\n` +
-          `Please send a valid link from <b>TikTok</b>, <b>Instagram Reels</b>, or <b>YouTube Shorts</b>.`,
+          `🔍 Не найдено поддерживаемой ссылки на видео.\n\n` +
+          `Отправьте ссылку из <b>TikTok</b>, <b>Instagram Reels</b> или <b>YouTube Shorts</b>.`,
           { parse_mode: 'HTML', reply_to_message_id: ctx.message.message_id }
         );
       }
       return;
     }
 
-    // Process each supported link (limit to 3 per message to prevent timeouts)
+    // Process each supported link (limit to 3 per message)
     const targetUrls = urls.slice(0, 3);
 
     for (const url of targetUrls) {
       try {
-        // Send typing / upload action immediately
         await ctx.replyWithChatAction('upload_video');
       } catch (e) {
         console.warn('[Bot] Failed to send chat action:', e);
       }
 
       try {
-        // Resolve direct clean video CDN URL
         const resolved = await resolveVideo(url);
         const caption = formatCaption(resolved);
+        const keyboard = new InlineKeyboard().url('📥 Скачать в HD (без сжатия)', resolved.directUrl);
 
         try {
-          // Attempt direct streaming to Telegram via URL
+          // Send with supports_streaming to preserve high-bitrate streaming playback
           await ctx.replyWithVideo(resolved.directUrl, {
             caption,
             parse_mode: 'HTML',
+            supports_streaming: true,
+            reply_markup: keyboard,
             reply_to_message_id: ctx.message.message_id,
           });
         } catch (streamError: unknown) {
-          // Automated fallback: If Telegram rejects sendVideo by URL (e.g. > 20 MB limit or Telegram fetch issue)
+          // Automated fallback if Telegram sendVideo by URL fails (>20 MB limit or Telegram fetch issue)
           console.warn(
-            `[Bot] sendVideo by URL failed for ${resolved.platform} (${url}), sending inline download button fallback:`,
+            `[Bot] sendVideo failed for ${resolved.platform} (${url}), sending inline button fallback:`,
             streamError instanceof Error ? streamError.message : streamError
           );
 
-          const keyboard = new InlineKeyboard().url('⬇️ Download Clean Video', resolved.directUrl);
-
           const fallbackMessage =
-            `🎬 <b>Video Ready!</b>\n\n` +
-            `${resolved.title ? `📌 <i>${escapeHtml(resolved.title)}</i>\n\n` : ''}` +
-            `⚠️ <i>Telegram could not stream this video directly (likely exceeds Telegram's 20 MB URL limit).</i>\n\n` +
-            `Tap the button below to stream or download directly without watermark:`;
+            `🎬 <b>Видео готово!</b>\n\n` +
+            `${caption}\n\n` +
+            `⚠️ <i>Размер файла превышает лимит прямого стриминга Telegram (20 МБ) или сервер Telegram временно ограничен.</i>\n\n` +
+            `Нажмите кнопку ниже, чтобы открыть или скачать видео в оригинальном качестве без сжатия:`;
 
           await ctx.reply(fallbackMessage, {
             reply_markup: keyboard,
@@ -167,30 +154,30 @@ export function createBot(customToken?: string): Bot {
       } catch (error: unknown) {
         console.error(`[Bot] Error resolving video from ${url}:`, error);
 
-        let userErrorMessage = '⚠️ An unexpected error occurred while fetching the video.';
+        let userErrorMessage = '⚠️ Произошла ошибка при получении видео.';
 
         if (error instanceof ResolverError) {
           switch (error.code) {
             case 'NOT_FOUND':
-              userErrorMessage = '❌ Could not find the requested video. Please check if the link is correct.';
+              userErrorMessage = '❌ Не удалось найти видео. Проверьте правильность ссылки.';
               break;
             case 'PRIVATE_OR_DELETED':
-              userErrorMessage = '🔒 This video appears to be private, region-restricted, or deleted.';
+              userErrorMessage = '🔒 Это видео приватное, заблокировано в регионе или удалено.';
               break;
             case 'RATE_LIMITED':
-              userErrorMessage = '⏳ The downloader service is currently busy. Please try again in 1-2 minutes.';
+              userErrorMessage = '⏳ Сервис временно перегружен. Пожалуйста, повторите попытку через 1 минуту.';
               break;
             case 'TIMEOUT':
-              userErrorMessage = '⏱️ The video service took too long to respond. Please try again shortly.';
+              userErrorMessage = '⏱️ Время ожидания ответа истекло. Пожалуйста, попробуйте еще раз.';
               break;
             case 'SCRAPER_DOWN':
-              userErrorMessage = '🔧 The scraper service is currently experiencing downtime or maintenance. Please try again later.';
+              userErrorMessage = '🔧 Сервис парсинга временно недоступен. Попробуйте чуть позже.';
               break;
             case 'UNSUPPORTED':
-              userErrorMessage = '❌ This URL format is not supported.';
+              userErrorMessage = '❌ Этот формат ссылки пока не поддерживается.';
               break;
             default:
-              userErrorMessage = `⚠️ Failed to process this video: ${escapeHtml(error.message)}`;
+              userErrorMessage = `⚠️ Не удалось обработать видео: ${escapeHtml(error.message)}`;
               break;
           }
         }

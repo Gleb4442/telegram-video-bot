@@ -102,7 +102,7 @@ export class TikTokResolver implements VideoResolver {
 
       // 'play' is the clean video without watermark.
       // In rare cases TikWM returns a relative URL starting with '/'
-      let directUrl = data.play || data.hdplay || data.wmplay;
+      let directUrl = data.hdplay || data.play || data.wmplay;
       if (!directUrl) {
         throw new ResolverError(
           'No playable video stream found in TikTok response',
