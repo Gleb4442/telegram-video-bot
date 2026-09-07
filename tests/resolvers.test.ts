@@ -198,3 +198,31 @@ describe('Video Resolvers', () => {
     });
   });
 });
+
+    it('parses TikTok photo slideshow images into albumItems', async () => {
+      const resolver = new TikTokResolver();
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          code: 0,
+          msg: 'success',
+          data: {
+            id: '7106594312292453678',
+            title: 'TikTok Photo Slideshow',
+            images: [
+              'https://p16.tiktokcdn.com/img1.jpg',
+              '/img2.jpg',
+            ],
+            music: 'https://v16.tiktokcdn.com/song.mp3',
+          },
+        }),
+      } as unknown as Response);
+
+      const result = await resolver.resolve('https://www.tiktok.com/@user/photo/7106594312292453678');
+      expect(result.isAlbum).toBe(true);
+      expect(result.albumItems).toHaveLength(2);
+      expect(result.albumItems?.[0]?.url).toBe('https://p16.tiktokcdn.com/img1.jpg');
+      expect(result.albumItems?.[1]?.url).toBe('https://www.tikwm.com/img2.jpg');
+      expect(result.audioUrl).toBe('https://v16.tiktokcdn.com/song.mp3');
+    });

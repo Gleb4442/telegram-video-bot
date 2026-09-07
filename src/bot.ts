@@ -1,7 +1,23 @@
-import { Bot, GrammyError, HttpError, InlineKeyboard } from 'grammy';
+import { Bot, GrammyError, HttpError, InlineKeyboard, InlineQueryResultBuilder, InputMediaBuilder } from 'grammy';
 import { getConfig } from './config.js';
 import { extractSupportedUrls, resolveVideo } from './services/resolvers/index.js';
 import { ResolvedVideo, ResolverError, SupportedPlatform } from './types/resolver.js';
+
+export interface UserPreferences {
+  cleanMode: boolean; // if true, send video without title/author caption
+}
+
+// In-memory cache for user preferences
+const userPrefsMap = new Map<number, UserPreferences>();
+
+export function getUserPreferences(userId: number): UserPreferences {
+  return userPrefsMap.get(userId) || { cleanMode: false };
+}
+
+export function setUserPreferences(userId: number, prefs: Partial<UserPreferences>): void {
+  const current = getUserPreferences(userId);
+  userPrefsMap.set(userId, { ...current, ...prefs });
+}
 
 /**
  * Escapes special HTML characters for Telegram HTML parse mode.
@@ -28,7 +44,9 @@ export function formatCaption(video: ResolvedVideo): string {
   };
 
   const lines: string[] = [];
-  lines.push(`<b>${platformIcons[video.platform] || '🎬 Видео'}</b>`);
+  const icon = platformIcons[video.platform] || '🎬 Видео';
+  const typeLabel = video.isAlbum ? ' (Альбом / Карусель)' : '';
+  lines.push(`<b>${icon}${typeLabel}</b>`);
 
   if (video.title && !video.title.endsWith('.mp4')) {
     const cleanTitle = video.title.length > 200 ? `${video.title.slice(0, 197)}...` : video.title;
@@ -68,16 +86,17 @@ export function createBot(customToken?: string): Bot {
   bot.command('start', async (ctx) => {
     const welcomeText =
       `👋 <b>Добро пожаловать в Universal Media Downloader!</b>\n\n` +
-      `Я скачиваю видео <b>в максимальном HD-качестве без водяных знаков</b> из:\n` +
-      `• 🎵 <b>TikTok</b> (Full HD 1080p + аудио)\n` +
-      `• 📸 <b>Instagram</b> (Reels & посты)\n` +
+      `Я скачиваю видео и фото-карусели <b>в максимальном HD-качестве без водяных знаков</b> из:\n` +
+      `• 🎵 <b>TikTok</b> (видео, фото-слайдшоу, музыка)\n` +
+      `• 📸 <b>Instagram</b> (Reels, посты, карусели фото)\n` +
       `• ▶️ <b>YouTube Shorts</b>\n` +
       `• 𝕏 <b>Twitter / X</b>\n` +
       `• 🤖 <b>Reddit</b>\n` +
       `• 🧵 <b>Threads</b>\n` +
       `• 📌 <b>Pinterest</b>\n\n` +
       `🚀 <b>Как пользоваться:</b>\n` +
-      `Просто отправьте или перешлите мне ссылку на любое видео.`;
+      `Просто отправьте или перешлите мне ссылку на любое видео или альбом.\n\n` +
+      `⚙️ Настроить режим отображения: /settings`;
 
     await ctx.reply(welcomeText, { parse_mode: 'HTML' });
   });
@@ -87,16 +106,93 @@ export function createBot(customToken?: string): Bot {
     const helpText =
       `📖 <b>Поддерживаемые платформы</b>\n\n` +
       `Отправьте ссылку одного из следующих форматов:\n\n` +
-      `• 🎵 <b>TikTok:</b> tiktok.com / vm.tiktok.com / vt.tiktok.com\n` +
-      `• 📸 <b>Instagram:</b> instagram.com/reel/... или /p/...\n` +
+      `• 🎵 <b>TikTok:</b> tiktok.com / vm.tiktok.com / vt.tiktok.com (видео и слайдшоу)\n` +
+      `• 📸 <b>Instagram:</b> instagram.com/reel/... или /p/... (Reels и карусели)\n` +
       `• ▶️ <b>YouTube Shorts:</b> youtube.com/shorts/... или youtu.be/...\n` +
       `• 𝕏 <b>Twitter / X:</b> twitter.com/... или x.com/...\n` +
       `• 🤖 <b>Reddit:</b> reddit.com/r/... или redd.it/...\n` +
       `• 🧵 <b>Threads:</b> threads.net/@...\n` +
       `• 📌 <b>Pinterest:</b> pin.it/... или pinterest.com/...\n\n` +
-      `⚡ Ролики отправляются в наилучшем качестве с кнопками скачивания HD и аудио (MP3).`;
+      `⚡ Медиа отправляются в оригинальном качестве с кнопками скачивания HD и аудио (MP3).\n` +
+      `⚙️ Настройки бота: /settings`;
 
     await ctx.reply(helpText, { parse_mode: 'HTML' });
+  });
+
+  // /settings command
+  bot.command('settings', async (ctx) => {
+    const userId = ctx.from?.id || 0;
+    const prefs = getUserPreferences(userId);
+
+    const keyboard = new InlineKeyboard()
+      .text(prefs.cleanMode ? '✅ Только чистое видео (без текста)' : '⚪ Только чистое видео (без текста)', 'pref_clean')
+      .row()
+      .text(!prefs.cleanMode ? '✅ С описанием и автором' : '⚪ С описанием и автором', 'pref_caption');
+
+    await ctx.reply(
+      `⚙️ <b>Настройки скачивания:</b>\n\n` +
+      `Выберите, как бот должен присылать медиа:\n\n` +
+      `• <b>Только чистое видео:</b> ролик без лишних подписей — удобно сразу сохранять в галерею или пересылать.\n` +
+      `• <b>С описанием:</b> добавляется платформа, название и автор.`,
+      { parse_mode: 'HTML', reply_markup: keyboard }
+    );
+  });
+
+  // Settings toggle callback query
+  bot.callbackQuery(['pref_clean', 'pref_caption'], async (ctx) => {
+    const userId = ctx.from.id;
+    const isClean = ctx.callbackQuery.data === 'pref_clean';
+    setUserPreferences(userId, { cleanMode: isClean });
+
+    const keyboard = new InlineKeyboard()
+      .text(isClean ? '✅ Только чистое видео (без текста)' : '⚪ Только чистое видео (без текста)', 'pref_clean')
+      .row()
+      .text(!isClean ? '✅ С описанием и автором' : '⚪ С описанием и автором', 'pref_caption');
+
+    await ctx.editMessageReplyMarkup({ reply_markup: keyboard }).catch(() => {});
+    await ctx.answerCallbackQuery({
+      text: isClean ? 'Режим: Только чистое видео' : 'Режим: С описанием и автором',
+    });
+  });
+
+  // Inline Query Handler (@bot <url>)
+  bot.on('inline_query', async (ctx) => {
+    const query = ctx.inlineQuery.query.trim();
+    const urls = extractSupportedUrls(query);
+
+    if (urls.length === 0) {
+      await ctx.answerInlineQuery([], { cache_time: 10 });
+      return;
+    }
+
+    const firstUrl = urls[0];
+    if (!firstUrl) {
+      await ctx.answerInlineQuery([], { cache_time: 10 });
+      return;
+    }
+
+    try {
+      const resolved = await resolveVideo(firstUrl);
+      const caption = formatCaption(resolved);
+      const thumb = resolved.thumbnailUrl || 'https://cdn-icons-png.flaticon.com/512/1384/1384060.png';
+
+      const result = InlineQueryResultBuilder.videoMp4(
+        'inline_vid_1',
+        resolved.title || `Видео из ${resolved.platform}`,
+        resolved.directUrl,
+        thumb,
+        {
+          caption,
+          parse_mode: 'HTML',
+          reply_markup: new InlineKeyboard().url('📥 Скачать в HD', resolved.directUrl),
+        }
+      );
+
+      await ctx.answerInlineQuery([result], { cache_time: 300 });
+    } catch (e) {
+      console.warn('[Bot] Inline query resolution failed:', e);
+      await ctx.answerInlineQuery([], { cache_time: 10 });
+    }
   });
 
   // Incoming text message handler
@@ -112,7 +208,7 @@ export function createBot(customToken?: string): Bot {
     if (urls.length === 0) {
       if (ctx.chat.type === 'private') {
         await ctx.reply(
-          `🔍 Не найдено поддерживаемой ссылки на видео.\n\n` +
+          `🔍 Не найдено поддерживаемой ссылки на медиа.\n\n` +
           `Поддерживаются: <b>TikTok, Instagram, YouTube Shorts, Twitter/X, Reddit, Threads, Pinterest</b>.`,
           { parse_mode: 'HTML', reply_to_message_id: ctx.message.message_id }
         );
@@ -120,6 +216,8 @@ export function createBot(customToken?: string): Bot {
       return;
     }
 
+    const userId = ctx.from?.id || 0;
+    const prefs = getUserPreferences(userId);
     const targetUrls = urls.slice(0, 3);
 
     for (const url of targetUrls) {
@@ -131,16 +229,49 @@ export function createBot(customToken?: string): Bot {
 
       try {
         const resolved = await resolveVideo(url);
-        const caption = formatCaption(resolved);
+        const caption = prefs.cleanMode ? undefined : formatCaption(resolved);
 
-        // Build inline keyboard with direct HD and audio buttons
+        // Case 1: Multi-item Album / Carousel (Instagram or TikTok photo slideshow)
+        if (resolved.isAlbum && resolved.albumItems && resolved.albumItems.length > 1) {
+          const items = resolved.albumItems.slice(0, 10);
+          const mediaGroup = items.map((item, index) => {
+            const itemCaption = index === 0 ? caption : undefined;
+            if (item.type === 'video') {
+              return InputMediaBuilder.video(item.url, {
+                caption: itemCaption,
+                parse_mode: 'HTML',
+                supports_streaming: true,
+              });
+            }
+            return InputMediaBuilder.photo(item.url, {
+              caption: itemCaption,
+              parse_mode: 'HTML',
+            });
+          });
+
+          await ctx.replyWithMediaGroup(mediaGroup, {
+            reply_to_message_id: ctx.message.message_id,
+          });
+
+          // If there's an attached audio track (e.g. TikTok slideshow music)
+          if (resolved.audioUrl) {
+            const audioKeyboard = new InlineKeyboard().url('🎧 Скачать аудио (MP3)', resolved.audioUrl);
+            await ctx.reply('🎵 <i>К этому альбому прикреплена музыка:</i>', {
+              parse_mode: 'HTML',
+              reply_markup: audioKeyboard,
+              reply_to_message_id: ctx.message.message_id,
+            });
+          }
+          continue;
+        }
+
+        // Case 2: Single Video / Photo
         const keyboard = new InlineKeyboard().url('📥 Скачать в HD (без сжатия)', resolved.directUrl);
         if (resolved.audioUrl) {
           keyboard.row().url('🎧 Скачать аудио (MP3)', resolved.audioUrl);
         }
 
         try {
-          // Send with supports_streaming to preserve high-bitrate streaming playback
           await ctx.replyWithVideo(resolved.directUrl, {
             caption,
             parse_mode: 'HTML',
@@ -156,7 +287,7 @@ export function createBot(customToken?: string): Bot {
 
           const fallbackMessage =
             `🎬 <b>Видео готово!</b>\n\n` +
-            `${caption}\n\n` +
+            `${caption ? `${caption}\n\n` : ''}` +
             `⚠️ <i>Размер файла превышает лимит прямого стриминга Telegram (20 МБ) или сервер Telegram временно ограничен.</i>\n\n` +
             `Нажмите кнопку ниже, чтобы открыть или скачать видео в оригинальном качестве:`;
 
@@ -167,17 +298,17 @@ export function createBot(customToken?: string): Bot {
           });
         }
       } catch (error: unknown) {
-        console.error(`[Bot] Error resolving video from ${url}:`, error);
+        console.error(`[Bot] Error resolving media from ${url}:`, error);
 
-        let userErrorMessage = '⚠️ Произошла ошибка при получении видео.';
+        let userErrorMessage = '⚠️ Произошла ошибка при получении медиа.';
 
         if (error instanceof ResolverError) {
           switch (error.code) {
             case 'NOT_FOUND':
-              userErrorMessage = '❌ Не удалось найти видео. Проверьте правильность ссылки.';
+              userErrorMessage = '❌ Не удалось найти медиа. Проверьте правильность ссылки.';
               break;
             case 'PRIVATE_OR_DELETED':
-              userErrorMessage = '🔒 Это видео приватное, заблокировано в регионе или удалено.';
+              userErrorMessage = '🔒 Этот контент приватный, заблокирован в регионе или удален.';
               break;
             case 'RATE_LIMITED':
               userErrorMessage = '⏳ Сервис временно перегружен. Пожалуйста, повторите попытку через 1 минуту.';
@@ -192,7 +323,7 @@ export function createBot(customToken?: string): Bot {
               userErrorMessage = '❌ Этот формат ссылки пока не поддерживается.';
               break;
             default:
-              userErrorMessage = `⚠️ Не удалось обработать видео: ${escapeHtml(error.message)}`;
+              userErrorMessage = `⚠️ Не удалось обработать медиа: ${escapeHtml(error.message)}`;
               break;
           }
         }

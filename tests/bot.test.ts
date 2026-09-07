@@ -275,7 +275,123 @@ describe('Bot Handlers and Utilities', () => {
         },
       });
 
-      expect(errorMessage).toContain('приватное');
+      expect(errorMessage).toContain('приватный');
+    });
+    it('sends replyWithMediaGroup when resolved media is an album/carousel', async () => {
+      const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
+      bot.botInfo = mockBotInfo;
+
+      vi.spyOn(resolverModule, 'resolveVideo').mockResolvedValue({
+        platform: 'instagram',
+        directUrl: 'https://cdn.example.com/item1.jpg',
+        title: 'Instagram 2-photo Carousel',
+        isAlbum: true,
+        albumItems: [
+          { type: 'photo', url: 'https://cdn.example.com/item1.jpg' },
+          { type: 'photo', url: 'https://cdn.example.com/item2.jpg' },
+        ],
+      });
+
+      let sentMediaGroup: any = null;
+      bot.api.config.use((_prev, method, payload: any) => {
+        if (method === 'sendMediaGroup') {
+          sentMediaGroup = payload.media;
+          return { ok: true, result: [{ message_id: 105, date: 1, chat: mockPrivateChat }] } as any;
+        }
+        return { ok: true, result: true } as any;
+      });
+
+      await bot.handleUpdate({
+        update_id: 5,
+        message: {
+          message_id: 5,
+          date: 1,
+          chat: mockPrivateChat,
+          from: mockUser,
+          text: 'https://www.instagram.com/p/C3zYAbCdEfG/',
+        },
+      });
+
+      expect(sentMediaGroup).toHaveLength(2);
+      expect(sentMediaGroup[0].type).toBe('photo');
+      expect(sentMediaGroup[0].media).toBe('https://cdn.example.com/item1.jpg');
+    });
+    it('handles /settings command and toggles clean mode via callback query', async () => {
+      const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
+      bot.botInfo = mockBotInfo;
+
+      let settingsMessage = '';
+      let replyMarkup: any = null;
+      bot.api.config.use((_prev, method, payload: any) => {
+        if (method === 'sendMessage') {
+          settingsMessage = payload.text;
+          replyMarkup = payload.reply_markup;
+          return { ok: true, result: { message_id: 106, date: 1, chat: mockPrivateChat, from: mockUser, text: payload.text } } as any;
+        }
+        if (method === 'editMessageReplyMarkup') {
+          return { ok: true, result: true } as any;
+        }
+        if (method === 'answerCallbackQuery') {
+          return { ok: true, result: true } as any;
+        }
+        return { ok: true, result: true } as any;
+      });
+
+      await bot.handleUpdate({
+        update_id: 6,
+        message: {
+          message_id: 6,
+          date: 1,
+          chat: mockPrivateChat,
+          from: mockUser,
+          text: '/settings',
+          entities: [{ type: 'bot_command', offset: 0, length: 9 }],
+        },
+      });
+
+      expect(settingsMessage).toContain('Настройки скачивания');
+      expect(replyMarkup?.inline_keyboard?.[0]?.[0]?.text).toContain('Только чистое видео');
+
+      // Click callback query to enable cleanMode
+      await bot.handleUpdate({
+        update_id: 7,
+        callback_query: {
+          id: 'cb_1',
+          from: mockUser,
+          message: { message_id: 106, date: 1, chat: mockPrivateChat },
+          data: 'pref_clean',
+          chat_instance: '123',
+        },
+      });
+
+      // Now send a video link: should be sent WITHOUT caption!
+      vi.spyOn(resolverModule, 'resolveVideo').mockResolvedValue({
+        platform: 'tiktok',
+        directUrl: 'https://v16.tiktokcdn.com/clean.mp4',
+        title: 'Video Title That Should Be Omitted in Clean Mode',
+      });
+
+      let videoCaption: string | undefined = 'initial';
+      bot.api.config.use((_prev, method, payload: any) => {
+        if (method === 'sendVideo') {
+          videoCaption = payload.caption;
+          return { ok: true, result: { message_id: 107, date: 1, chat: mockPrivateChat, from: mockUser } } as any;
+        }
+        return { ok: true, result: true } as any;
+      });
+
+      await bot.handleUpdate({
+        update_id: 8,
+        message: {
+          message_id: 8,
+          date: 1,
+          chat: mockPrivateChat,
+          from: mockUser,
+          text: 'https://vm.tiktok.com/ZM8xyZ123/',
+        },
+      });
+
+      expect(videoCaption).toBeUndefined();
     });
   });
 });

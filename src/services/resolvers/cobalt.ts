@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ResolvedVideo, ResolverError, SupportedPlatform, VideoResolver } from '../../types/resolver.js';
+import { MediaItem, ResolvedVideo, ResolverError, SupportedPlatform, VideoResolver } from '../../types/resolver.js';
 import { fetchWithTimeout } from '../../utils/http.js';
 import { getConfig } from '../../config.js';
 
@@ -178,6 +178,24 @@ export async function resolveWithCobalt(
     }
 
     if (data.status === 'picker' && data.picker && data.picker.length > 0) {
+      // Multi-item carousel/album (e.g. Instagram 2-10 photos/videos)
+      if (data.picker.length > 1) {
+        const albumItems: MediaItem[] = data.picker.map((item) => ({
+          type: item.type === 'video' ? 'video' : 'photo',
+          url: item.url,
+        }));
+
+        return {
+          directUrl: albumItems[0]?.url ?? '',
+          isAlbum: true,
+          albumItems,
+          audioUrl: data.audio,
+          title: data.filename,
+          platform,
+        };
+      }
+
+      // Single item in picker
       const videoItem = data.picker.find((p) => p.type === 'video') ?? data.picker[0];
       if (videoItem && videoItem.url) {
         return {

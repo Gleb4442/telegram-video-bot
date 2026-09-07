@@ -7,6 +7,11 @@ export type SupportedPlatform =
   | 'threads'
   | 'pinterest';
 
+export interface MediaItem {
+  type: 'video' | 'photo';
+  url: string;
+}
+
 export interface ResolvedVideo {
   directUrl: string;
   title?: string;
@@ -15,6 +20,8 @@ export interface ResolvedVideo {
   thumbnailUrl?: string;
   durationSeconds?: number;
   author?: string;
+  isAlbum?: boolean;
+  albumItems?: MediaItem[];
 }
 
 export interface VideoResolver {

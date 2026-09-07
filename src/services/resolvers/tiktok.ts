@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ResolvedVideo, ResolverError, VideoResolver } from '../../types/resolver.js';
+import { MediaItem, ResolvedVideo, ResolverError, VideoResolver } from '../../types/resolver.js';
 import { fetchWithTimeout } from '../../utils/http.js';
 
 const TikWMApiSchema = z.object({
@@ -12,6 +12,7 @@ const TikWMApiSchema = z.object({
       play: z.string().optional(),
       wmplay: z.string().optional(),
       hdplay: z.string().optional(),
+      images: z.array(z.string()).optional(),
       music: z.string().optional(),
       music_info: z
         .object({
@@ -105,6 +106,30 @@ export class TikTokResolver implements VideoResolver {
         );
       }
 
+      // Extract direct audio MP3 stream if available
+      let audioUrl = data.music || data.music_info?.play;
+      if (audioUrl && audioUrl.startsWith('/')) {
+        audioUrl = `https://www.tikwm.com${audioUrl}`;
+      }
+
+      // Check if this post is a photo slideshow / album
+      if (data.images && data.images.length > 0) {
+        const albumItems: MediaItem[] = data.images.map((imgUrl) => ({
+          type: 'photo',
+          url: imgUrl.startsWith('/') ? `https://www.tikwm.com${imgUrl}` : imgUrl,
+        }));
+
+        return {
+          directUrl: albumItems[0]?.url ?? '',
+          isAlbum: true,
+          albumItems,
+          audioUrl,
+          title: data.title?.trim() || undefined,
+          platform: this.platform,
+          author: data.author?.nickname || data.author?.unique_id,
+        };
+      }
+
       // Prioritize Full HD 1080p stream over standard SD
       let directUrl = data.hdplay || data.play || data.wmplay;
       if (!directUrl) {
@@ -117,12 +142,6 @@ export class TikTokResolver implements VideoResolver {
 
       if (directUrl.startsWith('/')) {
         directUrl = `https://www.tikwm.com${directUrl}`;
-      }
-
-      // Extract direct audio MP3 stream
-      let audioUrl = data.music || data.music_info?.play;
-      if (audioUrl && audioUrl.startsWith('/')) {
-        audioUrl = `https://www.tikwm.com${audioUrl}`;
       }
 
       return {

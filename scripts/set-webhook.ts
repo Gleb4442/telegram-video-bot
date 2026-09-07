@@ -44,7 +44,7 @@ Or set the WEBHOOK_URL environment variable:
     const setResult = await bot.api.setWebhook(webhookUrl, {
       secret_token: config.TELEGRAM_SECRET_TOKEN,
       drop_pending_updates: false,
-      allowed_updates: ['message'],
+      allowed_updates: ['message', 'callback_query', 'inline_query'],
       max_connections: 40,
     });
 
