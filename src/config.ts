@@ -24,7 +24,7 @@ export const ConfigSchema = z.object({
   COBALT_API_URL: z
     .string()
     .url('COBALT_API_URL must be a valid URL')
-    .default('https://api.cobalt.tools/'),
+    .default('https://cobalt-service-gleb.onrender.com/'),
 
   COBALT_API_KEY: z.string().optional(),
 
