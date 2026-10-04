@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { MediaItem, ResolvedVideo, ResolverError, SupportedPlatform, VideoResolver } from '../../types/resolver.js';
 import { fetchWithTimeout } from '../../utils/http.js';
-import { getConfig } from '../../config.js';
+import { getConfig, getAllCobaltUrls } from '../../config.js';
 
 // Modern Cobalt v10+ schema
 const CobaltModernSchema = z.object({
@@ -53,185 +53,267 @@ export const PINTEREST_URL_REGEX =
   /https?:\/\/(?:[a-zA-Z0-9_.-]+\.)?(?:pinterest\.[a-z.]+|pin\.it)\/[a-zA-Z0-9_./-]+/i;
 
 /**
- * Executes request to Cobalt API instance and extracts direct playable video URL.
+ * Executes request to Cobalt API instances with automatic failover and extracts direct playable video URL.
  */
 export async function resolveWithCobalt(
   url: string,
   platform: SupportedPlatform
 ): Promise<ResolvedVideo> {
   const config = getConfig();
-  const baseUrl = config.COBALT_API_URL.replace(/\/+$/, '');
-  const endpoint = `${baseUrl}/`;
-
-  const headers: Record<string, string> = {
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-    'User-Agent': 'TelegramVideoBot/1.0',
-  };
-
-  if (config.COBALT_API_KEY) {
-    const key = config.COBALT_API_KEY.trim();
-    if (key.startsWith('Bearer ') || key.startsWith('Api-Key ')) {
-      headers['Authorization'] = key;
-    } else {
-      headers['Authorization'] = `Api-Key ${key}`;
-    }
+  const instances = getAllCobaltUrls();
+  if (instances.length === 0) {
+    instances.push(config.COBALT_API_URL.replace(/\/+$/, ''));
   }
 
-  const payload = {
-    url: url.trim(),
-    videoQuality: 'max',
-    downloadMode: 'auto',
-    youtubeVideoCodec: 'h264',
-    youtubeBetterAudio: true,
-    disableMetadata: false,
-  };
+  let lastError: unknown = null;
 
-  let response: Response;
-  try {
-    response = await fetchWithTimeout(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      timeoutMs: 8000,
-    });
-  } catch (err: unknown) {
-    if (err instanceof Error && err.message.includes('timed out')) {
+  for (let i = 0; i < instances.length; i++) {
+    const rawInstance = instances[i];
+    if (!rawInstance) {
+      continue;
+    }
+    const baseUrl = rawInstance.replace(/\/+$/, '');
+    const endpoint = `${baseUrl}/`;
+    const isLastInstance = i === instances.length - 1;
+
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    };
+
+    if (config.COBALT_API_KEY) {
+      const key = config.COBALT_API_KEY.trim();
+      if (key.startsWith('Bearer ') || key.startsWith('Api-Key ')) {
+        headers['Authorization'] = key;
+      } else {
+        headers['Authorization'] = `Api-Key ${key}`;
+      }
+    }
+
+    const payload = {
+      url: url.trim(),
+      videoQuality: 'max',
+      downloadMode: 'auto',
+      youtubeVideoCodec: 'h264',
+      youtubeBetterAudio: true,
+      disableMetadata: false,
+    };
+
+    let response: Response;
+    try {
+      response = await fetchWithTimeout(endpoint, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+        timeoutMs: 6000,
+      });
+    } catch (err: unknown) {
+      lastError = err;
+      if (!isLastInstance) {
+        console.warn(
+          `[Cobalt] Request to ${baseUrl} failed (${err instanceof Error ? err.message : String(err)}). Trying next instance...`
+        );
+        continue;
+      }
+
+      if (err instanceof Error && err.message.includes('timed out')) {
+        throw new ResolverError(
+          'Cobalt API request timed out after 6 seconds',
+          platform,
+          'TIMEOUT',
+          err
+        );
+      }
       throw new ResolverError(
-        'Cobalt API request timed out after 8 seconds',
+        `Could not reach Cobalt API at ${baseUrl}: ${err instanceof Error ? err.message : String(err)}`,
         platform,
-        'TIMEOUT',
+        'SCRAPER_DOWN',
         err
       );
     }
-    throw new ResolverError(
-      `Could not reach Cobalt API at ${baseUrl}: ${err instanceof Error ? err.message : String(err)}`,
-      platform,
-      'SCRAPER_DOWN',
-      err
-    );
-  }
 
-  const rawJson: unknown = await response.json().catch(() => null);
+    const rawJson: unknown = await response.json().catch(() => null);
 
-  if (!rawJson || typeof rawJson !== 'object') {
-    throw new ResolverError(
-      `Cobalt API returned invalid non-JSON response with HTTP ${response.status}`,
-      platform,
-      'SCRAPER_DOWN'
-    );
-  }
-
-  const modernResult = CobaltModernSchema.safeParse(rawJson);
-  if (modernResult.success) {
-    const data = modernResult.data;
-
-    if (data.status === 'error' && data.error) {
-      const code = data.error.code;
-
-      if (code.includes('auth')) {
-        throw new ResolverError(
-          `Cobalt instance requires authentication (${code}). Please configure COBALT_API_KEY or set COBALT_API_URL to a self-hosted instance.`,
-          platform,
-          'SCRAPER_DOWN'
-        );
-      }
-
-      if (code.includes('private')) {
-        throw new ResolverError(
-          'This video is private and cannot be downloaded.',
-          platform,
-          'PRIVATE_OR_DELETED'
-        );
-      }
-
-      if (code.includes('deleted') || code.includes('not_found')) {
-        throw new ResolverError(
-          'The requested video could not be found or has been deleted.',
-          platform,
-          'NOT_FOUND'
-        );
-      }
-
-      if (code.includes('rate_limit')) {
-        throw new ResolverError(
-          'The scraper service is currently rate limited. Please try again shortly.',
-          platform,
-          'RATE_LIMITED'
-        );
-      }
-
-      throw new ResolverError(
-        `Cobalt scraper error: ${code}`,
+    if (!rawJson || typeof rawJson !== 'object') {
+      const err = new ResolverError(
+        `Cobalt API returned invalid non-JSON response with HTTP ${response.status}`,
         platform,
-        'UNKNOWN'
+        'SCRAPER_DOWN'
       );
+      lastError = err;
+      if (!isLastInstance) {
+        console.warn(`[Cobalt] Invalid response from ${baseUrl}. Trying next instance...`);
+        continue;
+      }
+      throw err;
     }
 
-    if ((data.status === 'tunnel' || data.status === 'redirect') && data.url) {
-      return {
-        directUrl: data.url,
-        audioUrl: data.audio,
-        title: data.filename,
-        platform,
-      };
-    }
+    const modernResult = CobaltModernSchema.safeParse(rawJson);
+    if (modernResult.success) {
+      const data = modernResult.data;
 
-    if (data.status === 'picker' && data.picker && data.picker.length > 0) {
-      // Multi-item carousel/album (e.g. Instagram 2-10 photos/videos)
-      if (data.picker.length > 1) {
-        const albumItems: MediaItem[] = data.picker.map((item) => ({
-          type: item.type === 'video' ? 'video' : 'photo',
-          url: item.url,
-        }));
+      if (data.status === 'error' && data.error) {
+        const code = data.error.code;
 
+        // If it's a server restriction / login / bot check, try next instance if available
+        const isServerRestriction =
+          code.includes('youtube.login') ||
+          code.includes('auth') ||
+          code.includes('rate_limit') ||
+          code.includes('fetch.fail') ||
+          code.includes('fetch.empty') ||
+          code.includes('content.video.unavailable');
+
+        if (!isLastInstance && isServerRestriction) {
+          console.warn(
+            `[Cobalt] Instance ${baseUrl} returned server restriction (${code}). Trying next instance...`
+          );
+          lastError = new ResolverError(
+            `Cobalt instance ${baseUrl} returned: ${code}`,
+            platform,
+            'SCRAPER_DOWN'
+          );
+          continue;
+        }
+
+        if (code.includes('auth')) {
+          throw new ResolverError(
+            `Cobalt instance requires authentication (${code}). Please configure COBALT_API_KEY or set COBALT_API_URL to a self-hosted instance.`,
+            platform,
+            'SCRAPER_DOWN'
+          );
+        }
+
+        if (code.includes('youtube.login')) {
+          throw new ResolverError(
+            'YouTube временно ограничил доступ к видео со стороны сервера парсера (требуется авторизация).',
+            platform,
+            'SCRAPER_DOWN'
+          );
+        }
+
+        if (code.includes('private')) {
+          throw new ResolverError(
+            'This video is private and cannot be downloaded.',
+            platform,
+            'PRIVATE_OR_DELETED'
+          );
+        }
+
+        if (code.includes('deleted') || code.includes('not_found')) {
+          throw new ResolverError(
+            'The requested video could not be found or has been deleted.',
+            platform,
+            'NOT_FOUND'
+          );
+        }
+
+        if (code.includes('content.video.unavailable')) {
+          throw new ResolverError(
+            'Видео недоступно (возможно, оно удалено, приватное или ограничено по региону/возрасту).',
+            platform,
+            'NOT_FOUND'
+          );
+        }
+
+        if (code.includes('rate_limit')) {
+          throw new ResolverError(
+            'The scraper service is currently rate limited. Please try again shortly.',
+            platform,
+            'RATE_LIMITED'
+          );
+        }
+
+        throw new ResolverError(
+          `Cobalt scraper error: ${code}`,
+          platform,
+          'UNKNOWN'
+        );
+      }
+
+      if ((data.status === 'tunnel' || data.status === 'redirect') && data.url) {
         return {
-          directUrl: albumItems[0]?.url ?? '',
-          isAlbum: true,
-          albumItems,
+          directUrl: data.url,
           audioUrl: data.audio,
           title: data.filename,
           platform,
         };
       }
 
-      // Single item in picker
-      const videoItem = data.picker.find((p) => p.type === 'video') ?? data.picker[0];
-      if (videoItem && videoItem.url) {
-        return {
-          directUrl: videoItem.url,
-          audioUrl: data.audio,
-          platform,
-        };
+      if (data.status === 'picker' && data.picker && data.picker.length > 0) {
+        // Multi-item carousel/album (e.g. Instagram 2-10 photos/videos)
+        if (data.picker.length > 1) {
+          const albumItems: MediaItem[] = data.picker.map((item) => ({
+            type: item.type === 'video' ? 'video' : 'photo',
+            url: item.url,
+          }));
+
+          return {
+            directUrl: albumItems[0]?.url ?? '',
+            isAlbum: true,
+            albumItems,
+            audioUrl: data.audio,
+            title: data.filename,
+            platform,
+          };
+        }
+
+        // Single item in picker
+        const videoItem = data.picker.find((p) => p.type === 'video') ?? data.picker[0];
+        if (videoItem && videoItem.url) {
+          return {
+            directUrl: videoItem.url,
+            audioUrl: data.audio,
+            platform,
+          };
+        }
+      }
+
+      if (data.status === 'local-processing' && data.tunnel && data.tunnel.length > 0) {
+        const firstTunnel = data.tunnel[0];
+        if (firstTunnel) {
+          return {
+            directUrl: firstTunnel,
+            audioUrl: data.audio,
+            platform,
+          };
+        }
       }
     }
 
-    if (data.status === 'local-processing' && data.tunnel && data.tunnel.length > 0) {
-      const firstTunnel = data.tunnel[0];
-      if (firstTunnel) {
-        return {
-          directUrl: firstTunnel,
-          audioUrl: data.audio,
-          platform,
-        };
-      }
+    // Fallback to legacy Cobalt response formats
+    const legacyResult = CobaltLegacySchema.safeParse(rawJson);
+    if (legacyResult.success && legacyResult.data.url) {
+      return {
+        directUrl: legacyResult.data.url,
+        title: legacyResult.data.text,
+        platform,
+      };
     }
-  }
 
-  // Fallback to legacy Cobalt response formats
-  const legacyResult = CobaltLegacySchema.safeParse(rawJson);
-  if (legacyResult.success && legacyResult.data.url) {
-    return {
-      directUrl: legacyResult.data.url,
-      title: legacyResult.data.text,
+    const err = new ResolverError(
+      `Failed to extract video stream from Cobalt API (HTTP ${response.status})`,
       platform,
-    };
+      'UNKNOWN'
+    );
+    lastError = err;
+    if (!isLastInstance) {
+      console.warn(`[Cobalt] Failed to extract stream from ${baseUrl}. Trying next instance...`);
+      continue;
+    }
+    throw err;
   }
 
+  if (lastError instanceof ResolverError) {
+    throw lastError;
+  }
   throw new ResolverError(
-    `Failed to extract video stream from Cobalt API (HTTP ${response.status})`,
+    `All Cobalt scraper instances failed: ${lastError instanceof Error ? lastError.message : String(lastError)}`,
     platform,
-    'UNKNOWN'
+    'SCRAPER_DOWN',
+    lastError
   );
 }
 

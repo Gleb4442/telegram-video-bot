@@ -26,6 +26,11 @@ export const ConfigSchema = z.object({
     .url('COBALT_API_URL must be a valid URL')
     .default('https://cobalt-service-gleb.onrender.com/'),
 
+  COBALT_FALLBACK_URLS: z
+    .string()
+    .optional()
+    .default('https://rue-cobalt.xenon.zone/'),
+
   COBALT_API_KEY: z.string().optional(),
 
   NODE_ENV: z
@@ -58,6 +63,29 @@ export function getConfig(): Config {
   return cachedConfig;
 }
 
+export function getAllCobaltUrls(): string[] {
+  const config = getConfig();
+  const urls: string[] = [];
+
+  const addUrl = (raw: string) => {
+    const trimmed = raw.trim().replace(/\/+$/, '');
+    if (trimmed && !urls.some((u) => u.replace(/\/+$/, '') === trimmed)) {
+      urls.push(trimmed);
+    }
+  };
+
+  if (config.COBALT_API_URL) {
+    config.COBALT_API_URL.split(',').forEach(addUrl);
+  }
+
+  if (config.COBALT_FALLBACK_URLS) {
+    config.COBALT_FALLBACK_URLS.split(',').forEach(addUrl);
+  }
+
+  return urls;
+}
+
 export function resetConfigForTesting(): void {
   cachedConfig = null;
 }
+

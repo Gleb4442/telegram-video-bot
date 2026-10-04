@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TikTokResolver } from '../src/services/resolvers/tiktok.js';
 import {
   InstagramResolver,
-  
+  YouTubeResolver,
   TwitterResolver,
   RedditResolver,
   ThreadsResolver,
@@ -113,7 +113,7 @@ describe('Video Resolvers', () => {
 
   describe('Cobalt Resolvers (Multi-platform)', () => {
     const instagramResolver = new InstagramResolver();
-    // const youtubeResolver = new YouTubeResolver();
+    const youtubeResolver = new YouTubeResolver();
     const twitterResolver = new TwitterResolver();
     const redditResolver = new RedditResolver();
     const threadsResolver = new ThreadsResolver();
@@ -135,6 +135,59 @@ describe('Video Resolvers', () => {
       expect(result.platform).toBe('instagram');
       expect(result.directUrl).toBe('https://cdn.cobalt.tools/tunnel/video-clean.mp4');
       expect(result.audioUrl).toBe('https://cdn.cobalt.tools/audio.mp3');
+    });
+
+    it('resolves YouTube Shorts video', async () => {
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          status: 'tunnel',
+          url: 'https://cdn.cobalt.tools/tunnel/yt-shorts.mp4',
+          filename: 'sample-short.mp4',
+        }),
+      } as unknown as Response);
+
+      const result = await youtubeResolver.resolve('https://www.youtube.com/shorts/dQw4w9WgXcQ');
+      expect(result.platform).toBe('youtube');
+      expect(result.directUrl).toBe('https://cdn.cobalt.tools/tunnel/yt-shorts.mp4');
+    });
+
+    it('falls back to secondary Cobalt instance when primary returns error.api.youtube.login', async () => {
+      process.env['COBALT_API_URL'] = 'https://primary-cobalt.example.com/';
+      process.env['COBALT_FALLBACK_URLS'] = 'https://fallback-cobalt.example.com/';
+      resetConfigForTesting();
+
+      const fetchMock = vi.fn()
+        // First call to primary fails with YouTube login error
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          json: async () => ({
+            status: 'error',
+            error: {
+              code: 'error.api.youtube.login',
+              context: { service: 'youtube' },
+            },
+          }),
+        } as unknown as Response)
+        // Second call to fallback succeeds
+        .mockResolvedValueOnce({
+          ok: true,
+          status: 200,
+          json: async () => ({
+            status: 'tunnel',
+            url: 'https://fallback-cobalt.example.com/tunnel/video-123.mp4',
+            filename: 'youtube_short.mp4',
+          }),
+        } as unknown as Response);
+
+      global.fetch = fetchMock;
+
+      const result = await youtubeResolver.resolve('https://www.youtube.com/shorts/dQw4w9WgXcQ');
+      expect(result.platform).toBe('youtube');
+      expect(result.directUrl).toBe('https://fallback-cobalt.example.com/tunnel/video-123.mp4');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
     });
 
     it('resolves Twitter video', async () => {
