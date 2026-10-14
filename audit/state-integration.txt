@@ -1,0 +1,13 @@
+
+> telegram-video-bot@1.0.0 test:integration /Users/pro/telegram-video-bot
+> vitest run --config vitest.integration.config.ts
+
+
+ RUN  v5.0.4 /Users/pro/telegram-video-bot
+
+
+ Test Files  1 passed (1)
+      Tests  4 passed (4)
+   Start at  00:01:05
+   Duration  770ms (tests 72%, transform 15%, import 12%, worker 1%)
+

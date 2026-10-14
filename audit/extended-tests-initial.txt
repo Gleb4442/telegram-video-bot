@@ -1,0 +1,13 @@
+
+> telegram-video-bot@1.0.0 test /Users/pro/telegram-video-bot
+> vitest run
+
+
+ RUN  v5.0.4 /Users/pro/telegram-video-bot
+
+
+ Test Files  14 passed (14)
+      Tests  128 passed (128)
+   Start at  23:45:09
+   Duration  507ms (import 49%, transform 41%, tests 8%, worker 2%)
+

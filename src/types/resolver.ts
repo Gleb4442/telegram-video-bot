@@ -1,19 +1,21 @@
 export type SupportedPlatform =
-  | 'tiktok'
-  | 'instagram'
-  | 'youtube'
-  | 'twitter'
-  | 'reddit'
-  | 'threads'
-  | 'pinterest';
+  | "tiktok"
+  | "instagram"
+  | "youtube"
+  | "twitter"
+  | "reddit"
+  | "threads"
+  | "pinterest";
 
 export interface MediaItem {
-  type: 'video' | 'photo';
+  type: "video" | "photo";
   url: string;
 }
 
 export interface ResolvedVideo {
+  mediaType?: "video" | "photo";
   directUrl: string;
+  alternativeUrls?: string[];
   title?: string;
   platform: SupportedPlatform;
   audioUrl?: string;
@@ -36,16 +38,17 @@ export class ResolverError extends Error {
     message: string,
     public readonly platform: SupportedPlatform,
     public readonly code:
-      | 'NOT_FOUND'
-      | 'PRIVATE_OR_DELETED'
-      | 'RATE_LIMITED'
-      | 'TIMEOUT'
-      | 'SCRAPER_DOWN'
-      | 'UNSUPPORTED'
-      | 'UNKNOWN',
-    public readonly cause?: unknown
+      | "NOT_FOUND"
+      | "PRIVATE_OR_DELETED"
+      | "AGE_RESTRICTED"
+      | "RATE_LIMITED"
+      | "TIMEOUT"
+      | "SCRAPER_DOWN"
+      | "UNSUPPORTED"
+      | "UNKNOWN",
+    public readonly cause?: unknown,
   ) {
     super(message);
-    this.name = 'ResolverError';
+    this.name = "ResolverError";
   }
 }

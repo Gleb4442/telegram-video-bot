@@ -1,239 +1,73 @@
-# 🎬 Serverless Telegram Video Downloader Bot (Vercel + TypeScript)
+# Telegram media downloader
 
-A production-ready, serverless Telegram bot built with **TypeScript**, **grammY**, and **Zod** that downloads short-form videos without watermarks from **TikTok**, **Instagram Reels**, and **YouTube Shorts**. Designed specifically to run inside **Vercel Serverless Functions**.
+Downloads public TikTok, Instagram, YouTube, Twitter/X, Reddit, Threads and Pinterest media into Telegram. Supports captions, clean mode, document mode and photo/video albums. Instagram uses a direct anonymous browser-compatible extractor, with Cobalt as fallback. Other platforms use the configured scraper services.
 
----
+## Runtime
 
-## ⚡ Architectural Design & Zero-Buffering Model
+Node.js 24+, pnpm 10.33.0. Copy `.env.example` to `.env`, set the Telegram token and webhook secret.
 
-### 1. The Vercel Limits Challenge
-- Vercel Serverless Functions enforce a strict **4.5 MB request/response payload limit** and **10–15 second execution timeouts** on Hobby tiers.
-- Downloading, transcoding, or buffering full 1080p video binaries (often 15–80 MB) inside serverless memory or `/tmp` causes immediate out-of-memory errors, payload truncation, or timeouts.
-
-### 2. The Direct URL Resolver Solution
-This bot operates strictly as a high-speed **URL Resolver**:
-```
-User Link  ──>  Telegram Webhook  ──>  Vercel Function (api/webhook.ts)
-                                              │
-                                              ▼
-                                   Platform Resolvers
-                                   (TikWM / Cobalt APIs)
-                                              │
-                                              ▼ (Direct CDN URL extracted)
-Telegram User <──  Direct Video Stream  <──  bot.api.sendVideo(chatId, directUrl)
-                   (Fetched directly by
-                    Telegram's CDN servers)
-```
-- **Zero Local Buffering**: The function extracts the direct video file URL from scraper services in under 1–2 seconds.
-- **Delegated Ingestion**: Passes the raw CDN URL string directly to Telegram Bot API (`sendVideo(chatId, directUrl)`). Telegram's own infrastructure fetches and streams the video directly to the user.
-- **Fast Execution**: Average webhook execution time is **< 1.5 seconds**, well within Vercel's limits.
-- **Strict Network Controls**: All external API calls use `fetchWithTimeout` equipped with `AbortController` and an 8-second cutoff.
-
-### 3. Automated Fallback for Telegram's 20 MB URL Limit
-- Telegram's Bot API limits `sendVideo` by URL to **20 MB**.
-- If a video exceeds 20 MB or Telegram's servers encounter fetch restrictions, the bot catches the error automatically and sends an **Inline Keyboard** with a direct high-speed download link (`InlineKeyboardButton(url=directVideoUrl)`).
-- Users can watch or download the uncompressed, watermark-free video with a single tap.
-
----
-
-## 🛠️ Supported Platforms & Resolvers
-
-| Platform | Resolver Engine | Capabilities |
-| :--- | :--- | :--- |
-| **TikTok** | **TikWM API** | Watermark-free clean video, sound extraction, creator credit, handles `tiktok.com/@user/video/...`, `vm.tiktok.com`, `vt.tiktok.com`. |
-| **Instagram** | **Cobalt API** | Clean Reels & Posts scraper, full resolution, handles `instagram.com/reel/...`, `/reels/...`, `/p/...`, and share links. |
-| **YouTube Shorts** | **Cobalt API** | Full quality H.264 video, handles `youtube.com/shorts/...` and `youtu.be/...`. |
-
-> **Note on Cobalt**: Defaults to `https://api.cobalt.tools/`. You can specify your own self-hosted or authenticated Cobalt instance via `COBALT_API_URL` and `COBALT_API_KEY`.
-
----
-
-## 📁 Project Structure
-
-```
-telegram-video-bot/
-├── api/
-│   └── webhook.ts              # Universal Vercel Serverless webhook handler
-├── src/
-│   ├── bot.ts                  # grammY bot setup, commands (/start, /help), link handlers
-│   ├── config.ts               # Environment variable validation via Zod
-│   ├── services/
-│   │   └── resolvers/
-│   │       ├── index.ts        # Resolver registry & URL pattern extractor
-│   │       ├── tiktok.ts       # TikWM TikTok resolver adapter
-│   │       └── cobalt.ts       # Cobalt Instagram Reels & YouTube Shorts adapter
-│   ├── types/
-│   │   └── resolver.ts         # VideoResolver, ResolvedVideo, and ResolverError types
-│   └── utils/
-│       └── http.ts             # Fetch wrapper with AbortController & 8s timeout
-├── scripts/
-│   ├── set-webhook.ts          # CLI helper to register webhook & secret token
-│   ├── delete-webhook.ts       # CLI helper to delete webhook (re-enable polling)
-│   └── dev-polling.ts          # Local development runner with long-polling
-├── tests/
-│   ├── bot.test.ts             # Bot handler & Telegram fallback flow unit tests
-│   ├── regex.test.ts           # URL regex and extractor unit tests
-│   ├── resolvers.test.ts       # Scraper API adapter & parser unit tests
-│   └── webhook.test.ts         # Secret token validation & health check tests
-├── vercel.json                 # Vercel function configuration
-├── tsconfig.json               # Strict TypeScript configuration
-└── package.json
-```
-
----
-
-## 🔒 Security: Telegram Webhook Secret Token
-
-Telegram sends the header `X-Telegram-Bot-Api-Secret-Token` with every webhook request.
-- The webhook endpoint (`api/webhook.ts`) verifies that this header strictly matches `TELEGRAM_SECRET_TOKEN`.
-- Any request with a missing or invalid token is immediately rejected with `401 Unauthorized`, protecting your function from unauthorized invocations and DDoS attempts.
-
----
-
-## 🚀 Step-by-Step Setup & Deployment Guide
-
-### Prerequisites
-- Node.js 20+ installed
-- A Telegram account
-- A free [Vercel](https://vercel.com) account
-
-### Step 1: Create Your Bot on Telegram
-1. Open Telegram and start a chat with [@BotFather](https://t.me/BotFather).
-2. Send `/newbot` and follow the prompts to choose a name and username (e.g. `MyVideoDownloaderBot`).
-3. Copy the **HTTP API Token** provided (e.g. `1234567890:ABCdefGHIjklMNOpqrsTUVwxyz`).
-
-### Step 2: Generate a Secret Webhook Token
-Generate a random secret token (1–256 characters, containing `A-Z`, `a-z`, `0-9`, `_`, `-`):
-```bash
-# Example using openssl:
-openssl rand -hex 24
-```
-
-### Step 3: Install Dependencies & Run Tests
-```bash
-cd telegram-video-bot
-pnpm install
+```sh
+pnpm install --frozen-lockfile
+pnpm typecheck
 pnpm test
-```
-All unit tests should pass with 100% success.
-
-### Step 4: Local Testing (Long Polling Mode)
-You can test the bot locally without needing any tunnel or Vercel deployment:
-1. Create a `.env` file from `.env.example`:
-   ```bash
-   cp .env.example .env
-   ```
-2. Fill in your `TELEGRAM_BOT_TOKEN` and `TELEGRAM_SECRET_TOKEN`.
-3. Start the dev runner:
-   ```bash
-   pnpm dev
-   ```
-4. Open your bot in Telegram and send a TikTok, Instagram Reel, or YouTube Shorts link!
-
----
-
-### Step 5: Deploy to Vercel
-
-#### Option A: Deploy via Vercel CLI
-1. Install Vercel CLI (if not already installed):
-   ```bash
-   npm install -g vercel
-   ```
-2. Run deployment from project root:
-   ```bash
-   vercel
-   ```
-3. Follow prompts to link/create the project.
-4. Set the environment variables in Vercel:
-   ```bash
-   vercel env add TELEGRAM_BOT_TOKEN
-   vercel env add TELEGRAM_SECRET_TOKEN
-   vercel env add COBALT_API_URL
-   vercel env add COBALT_API_KEY
-   ```
-5. Deploy to production:
-   ```bash
-   vercel --prod
-   ```
-
-#### Option B: Deploy via GitHub / Vercel Dashboard
-1. Push your code to a GitHub repository:
-   ```bash
-   git add .
-   git commit -m "Initial commit of serverless telegram video bot"
-   git remote add origin https://github.com/your-username/telegram-video-bot.git
-   git push -u origin main
-   ```
-2. In the [Vercel Dashboard](https://vercel.com/new), import your repository.
-3. Under **Environment Variables**, configure:
-   - `TELEGRAM_BOT_TOKEN`: Your bot token from @BotFather.
-   - `TELEGRAM_SECRET_TOKEN`: Your generated secret token.
-   - `COBALT_API_URL`: (Optional) `https://api.cobalt.tools/` or self-hosted URL.
-   - `COBALT_API_KEY`: (Optional) Your API key if using an authenticated instance.
-4. Click **Deploy**. Note your production URL (e.g. `https://telegram-video-bot.vercel.app`).
-
----
-
-### Step 6: Register the Webhook with Telegram
-Once deployed, register your Vercel endpoint with Telegram using our automated helper script:
-
-```bash
-pnpm set-webhook https://your-deployment.vercel.app/api/webhook
+pnpm build
 ```
 
-The script will:
-- Authenticate with Telegram Bot API
-- Register the webhook URL with `secret_token` and `allowed_updates: ["message"]`
-- Retrieve and verify the live webhook status:
-```
-📡 Setting Telegram Webhook...
-- Webhook URL:   https://your-deployment.vercel.app/api/webhook
-- Secret Token:  ************************
-🤖 Connected to Bot: @MyVideoDownloaderBot (Video Downloader)
-✅ Webhook successfully registered with Telegram!
+`pnpm dev` switches the bot from its webhook to polling. Pending updates are preserved. `--drop-pending` is the explicit opt-in to discard them; use a separate development bot when production must remain available. Polling is sequential and intended for development.
 
-📊 Current Webhook Status:
-- URL:                     https://your-deployment.vercel.app/api/webhook
-- Custom certificate:      false
-- Pending update count:    0
-- Max connections:         40
-- Allowed updates:         message
-- Last error:              None (healthy)
+## Free serverless deployment
 
-🎉 Bot is ready to receive updates on Vercel!
+The recommended architecture uses one Vercel Hobby project, Inngest Free and Upstash Redis Free. No permanent worker or VPS is required:
+
+```mermaid
+flowchart LR
+  Telegram --> Webhook[Authenticated webhook]
+  Webhook --> Queue[Inngest durable events]
+  Queue --> Function[Vercel processing function]
+  Function --> Scrapers[TikWM / configured Cobalt services]
+  Function --> API[Telegram multipart / file_id]
+  Function <--> State[Upstash settings and delivery checkpoints]
 ```
 
----
+1. Create an Inngest Free account/app and Upstash Redis Free database. Keep them on free plans; no paid upgrade is required by this project.
+2. Set `INNGEST_EVENT_KEY`, `INNGEST_SIGNING_KEY`, `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` in Vercel, alongside the bot configuration.
+3. Use Node.js 24 and Fluid Compute. `vercel.json` enables Fluid and gives `/api/inngest` a 300-second execution limit.
+4. Deploy. Register/sync the deployed `/api/inngest` endpoint in Inngest. Allow this endpoint through deployment protection if enabled; the SDK verifies execution signatures.
+5. Check a run in the Inngest dashboard, then register `/api/webhook` using `pnpm set-webhook https://YOUR-HOST/api/webhook`. Pending updates are retained.
+6. Verify a real download in your own bot chat. Inline mode additionally requires `/setinline` in BotFather.
 
-## 🧪 Testing & Health Checks
+A webhook returns success only after Inngest accepts the event. Queue submission failure returns 503 for Telegram retry. Processing runs with global concurrency 4 and per-user concurrency 1, with bounded retries. Redis stores settings, quotas, completed updates and confirmed delivery steps; deduplication retention is 7 days. Confirmed sends survive ordinary retries. A process crash between a Telegram send and writing its checkpoint can still duplicate that send: Telegram provides no transactional idempotency key.
 
-### Webhook Health Check
-You can test that your Vercel serverless function is live and responding by opening:
-```
-GET https://your-deployment.vercel.app/api/webhook
-```
-Response:
-```json
-{
-  "status": "healthy",
-  "service": "telegram-video-bot-webhook",
-  "timestamp": "2026-09-07T13:15:00.000Z"
-}
-```
+Without all four queue/state variables the bot retains a bounded synchronous mode: 50-second update deadline, temporary per-process settings, no durable replay protection. It is useful for migration/testing; the full reliability improvements require the free services above. Partial queue credentials fail configuration validation.
 
-### Run Vitest Test Suite
-```bash
-pnpm test
-```
-Tests cover:
-- URL regex matching and entity parsing (TikTok, Instagram, YouTube Shorts)
-- TikWM API payload parsing and relative URL normalization
-- Cobalt API modern (v10) and legacy response parsing
-- Secret token verification and 401 unauthorized rejections
-- Telegram 20 MB sendVideo failure fallback to inline keyboard buttons
-- Error status handling for private/deleted/rate-limited videos
+## Long and large videos
 
----
+There is no 10-minute duration cutoff. Media is streamed to a temporary file and uploaded with multipart, rather than passed to Telegram as an HTTP URL. Downloaded bytes are not held as one large in-memory buffer. Temporary files are removed after upload or failure. URL validation, public DNS/IP pinning, redirect checks, byte caps and cancellation protect the downloader.
 
-## 📜 License
-MIT License. Built for serverless environments.
+The standard Telegram Bot API permits up to 50 MB per uploaded video/document (10 MB for photos), whereas URL-based delivery permits only 20 MB for videos. If a video exceeds the configured upload cap, the bot tries the source's smaller TikTok stream or a Cobalt 480p rendition, while keeping the original download button. Smaller renditions are available only when the scraper supplies them. A 10-minute video may fit; duration alone cannot guarantee a file below 50 MB. Larger originals fall back to links. The 2000 MB local Bot API option requires a server and is intentionally outside this free deployment.
+
+Video/document albums upload in batches of 2 to bound temporary disk use; photo albums use batches of 10. All batches are processed. Failed batches receive download buttons. Previously uploaded single files can reuse Telegram `file_id`, avoiding repeated transfer. Scraper results have a short 2-minute cache; concurrent identical requests share one lookup. Tracking parameters are removed from TikTok/Instagram resolution requests and cache identity.
+
+## Scraper reliability
+
+TikTok uses TikWM with Cobalt fallback. Other platforms use configured Cobalt endpoints with failover. Queue mode retries temporary resolution failures once. HTTP 429, 5xx, body timeouts and malformed replies are handled. Media requiring unsupported local merging is rejected instead of sending a silent video-only stream.
+
+`COBALT_API_KEY` is sent only to the primary configured endpoint. API redirects are rejected. Fallback instances must be authorized for your use and operated appropriately; their presence does not provide an uptime guarantee. Do not rotate arbitrary public instances or bypass their authentication/bot protection.
+
+Instagram extraction was repaired on 2026-10-15: the current logged-out GraphQL query uses a numeric media ID and browser-compatible TLS/HTTP2 through pinned `curl-cffi-node@0.1.8`. Native calls use `performAsync`, fresh anonymous cookies and verified TLS, with redirects disabled; no Instagram account, paid proxy or separate server is needed. Vercel bundles the native Linux binding explicitly. Cobalt remains a fallback for extraction/transport failures.
+
+The supplied `DeXA5froeiC` reel was downloaded through the application extractor and streaming downloader: 10,404,586-byte MP4, H.264 video + AAC audio, 106.14 seconds. `Dd-4gKENRms` has an explicit Instagram age gate, independently confirmed in Chrome without login; the bot now explains that restriction rather than reporting an outage. Age-gated/private media requires an authorized Instagram account and is outside anonymous extraction. Reproduce with `pnpm exec tsx scripts/probe-instagram-direct.ts` (requires ffprobe); sanitized results are in `audit/instagram-direct-live.jsonl`.
+
+Instagram's undocumented query and access policies can change; no extractor can guarantee access to every post. Monitor extraction failures and keep the query/transport current.
+
+## Checks and operations
+
+`pnpm test` runs portable regression tests, excluding generated `dist` tests. `pnpm test:integration` runs Redis persistence/Lua/concurrency tests against a disposable local Redis server; `redis-server` and `redis-cli` are required (override with `REDIS_SERVER_BIN` / `REDIS_CLI_BIN`). It never connects to the production Redis database.
+
+Logs use update IDs and error codes rather than full user URLs or tokens. Check Vercel function logs, failed Inngest runs, Telegram `getWebhookInfo`, and Upstash usage before a quota is exhausted. Free tiers have finite quotas; the app cannot guarantee unlimited throughput or uninterrupted service after those limits.
+
+Current published limits: [Inngest Free: 50,000 executions/month and 5 concurrent steps](https://www.inngest.com/pricing); [Upstash Redis Free: 250 MB and 500,000 commands/month](https://upstash.com/pricing/redis). A function run plus its step uses multiple executions, so 50,000 executions is not 50,000 downloads. Vercel compute/network quotas may be the earlier bottleneck. Multiple Vercel projects do not remove Telegram limits or scraper failures.
+
+Protocol references: [Telegram sending files](https://core.telegram.org/bots/api#sending-files), [Vercel duration limits](https://vercel.com/docs/functions/configuring-functions/duration), [Cobalt API contract](https://github.com/imputnet/cobalt/blob/main/docs/api.md).
+
+See `AUDIT_REPORT.md` for findings, fixes, verification and remaining external requirements. No changes have been deployed by the audit.

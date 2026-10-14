@@ -1,0 +1,13 @@
+Final local checks, 2026-10-15:
+Node runtime24+ requirement enforced in package.json; current host Node26.
+pnpm typecheck: PASS
+pnpm build: PASS
+pnpm test:112 PASS,12 files (no generated dist tests)
+pnpm test:integration:4 PASS,1 file, real disposable Redis8.2.2
+pnpm audit:0 vulnerabilities
+pnpm audit --prod:0 vulnerabilities
+git diff --check: PASS
+Telegram production deployment/webhook/pending messages: NOT MODIFIED
+Inngest/Upstash cloud provisioning and real Telegram multipart upload: NOT RUN
+User Instagram reels: all4 configured scraper probes failed error.api.fetch.empty
+Live public MP4 download: PASS (1128375 bytes); file cleaned

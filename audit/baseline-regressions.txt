@@ -1,0 +1,407 @@
+
+ RUN  v3.2.7 /private/var/folders/nq/3lg2gj3n2051k749x0f9gbjr0000gn/T/telegram-bot-audit-baseline-vrljxg19
+
+ ❯ tests/webhook-completion.test.ts (2 tests | 2 failed) 8ms
+   × does not acknowledge an unfinished update at 9 seconds (web adapter) 7ms
+     → expected true to be false // Object.is equality
+   × does not acknowledge an unfinished update at 9 seconds (node adapter) 1ms
+     → req.on is not a function
+stderr | tests/audit-regressions.test.ts > Audit: media delivery > offers every failed album item as a download link
+[Bot] Error resolving media from https://instagram.com/p/test/: Error: Telegram rejected album
+    at /private/var/folders/nq/3lg2gj3n2051k749x0f9gbjr0000gn/T/telegram-bot-audit-baseline-vrljxg19/tests/audit-regressions.test.ts:82:46
+    at ApiClient.call (/Users/pro/telegram-video-bot/node_modules/.pnpm/grammy@1.46.0/node_modules/grammy/out/core/client.js:10:41)
+    at ApiClient.callApi (/Users/pro/telegram-video-bot/node_modules/.pnpm/grammy@1.46.0/node_modules/grammy/out/core/client.js:97:33)
+    at Api.sendMediaGroup (/Users/pro/telegram-video-bot/node_modules/.pnpm/grammy@1.46.0/node_modules/grammy/out/core/api.js:354:25)
+    at Context.replyWithMediaGroup (/Users/pro/telegram-video-bot/node_modules/.pnpm/grammy@1.46.0/node_modules/grammy/out/context.js:998:25)
+    at /private/var/folders/nq/3lg2gj3n2051k749x0f9gbjr0000gn/T/telegram-bot-audit-baseline-vrljxg19/src/bot.ts:300:21
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at /Users/pro/telegram-video-bot/node_modules/.pnpm/grammy@1.46.0/node_modules/grammy/out/composer.js:578:13
+    at /Users/pro/telegram-video-bot/node_modules/.pnpm/grammy@1.46.0/node_modules/grammy/out/composer.js:62:13
+    at /Users/pro/telegram-video-bot/node_modules/.pnpm/grammy@1.46.0/node_modules/grammy/out/composer.js:578:13
+
+ ❯ tests/audit-regressions.test.ts (17 tests | 15 failed) 18ms
+   × Audit: media delivery > sends a single photo with sendPhoto 5ms
+     → expected undefined to be 'https://cdn.example.com/1.jpg' // Object.is equality
+   × Audit: media delivery > delivers every item in a 11-item album, including a single-item tail 1ms
+     → expected [ …(10) ] to deeply equal [ …(11) ]
+   × Audit: media delivery > delivers every item in a 21-item album, including a single-item tail 0ms
+     → expected [ …(10) ] to deeply equal [ …(21) ]
+   × Audit: media delivery > offers every failed album item as a download link 2ms
+     → Cannot read properties of undefined (reading 'inline_keyboard')
+   × Audit: media delivery > resolves links hidden in a forwarded media caption 1ms
+     → expected "resolveVideo" to be called with arguments: [ 'https://vm.tiktok.com/test/' ]
+
+Number of calls: 0
+
+   × Audit: media delivery > discovers actual bot identity so addressed commands work for a different bot 1ms
+     → expected false to be true // Object.is equality
+   × Audit: media delivery > keeps captions within Telegram limits when the scraper returns an enormous author 0ms
+     → expected 5218 to be less than 1024
+   × Audit: HTTP and parsing > bounds a JSON body that stalls after response headers 1ms
+     → (0 , fetchJsonWithTimeout) is not a function
+   × Audit: HTTP and parsing > preserves caller cancellation during JSON reads 0ms
+     → (0 , fetchJsonWithTimeout) is not a function
+   × Audit: HTTP and parsing > does not return a video-only local-processing tunnel as a complete video 3ms
+     → expected ResolverError: Failed to extract video st… { …(2) } to match object { code: 'UNSUPPORTED' }
+(3 matching properties omitted from actual)
+   × Audit: HTTP and parsing > retains a single Cobalt picker photo type 1ms
+     → expected { …(3) } to match object { mediaType: 'photo' }
+(3 matching properties omitted from actual)
+   × Audit: HTTP and parsing > classifies TikWM HTTP 429 correctly 0ms
+     → expected ResolverError: TikWM API responded with H… { …(2) } to match object { code: 'RATE_LIMITED' }
+(3 matching properties omitted from actual)
+   ✓ Audit: HTTP and parsing > classifies TikWM HTTP 503 correctly 0ms
+   × Audit: HTTP and parsing > classifies Cobalt HTTP 429 even with a non-JSON body 1ms
+     → expected ResolverError: Cobalt API returned invali… { …(2) } to match object { code: 'RATE_LIMITED' }
+(3 matching properties omitted from actual)
+   ✓ Audit: HTTP and parsing > classifies Cobalt HTTP 503 even with a non-JSON body 0ms
+   × Audit: LRU > updates an existing key at capacity without evicting an unrelated key 0ms
+     → expected undefined to be 'a' // Object.is equality
+   × Audit: LRU > expires at the exact TTL boundary 0ms
+     → expected 'a' to be undefined
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 17 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: media delivery > sends a single photo with sendPhoto
+AssertionError: expected undefined to be 'https://cdn.example.com/1.jpg' // Object.is equality
+
+- Expected: 
+"https://cdn.example.com/1.jpg"
+
++ Received: 
+undefined
+
+ ❯ tests/audit-regressions.test.ts:57:70
+     55|     const { bot, calls } = setupBot();
+     56|     await bot.handleUpdate(textUpdate('https://instagram.com/p/test/')…
+     57|     expect(calls.find(c => c.method === 'sendPhoto')?.payload.photo).t…
+       |                                                                      ^
+     58|     expect(calls.some(c => c.method === 'sendVideo')).toBe(false);
+     59|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/17]⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: media delivery > delivers every item in a 11-item album, including a single-item tail
+AssertionError: expected [ …(10) ] to deeply equal [ …(11) ]
+
+- Expected
++ Received
+
+@@ -7,7 +7,6 @@
+    "https://cdn.example.com/5.jpg",
+    "https://cdn.example.com/6.jpg",
+    "https://cdn.example.com/7.jpg",
+    "https://cdn.example.com/8.jpg",
+    "https://cdn.example.com/9.jpg",
+-   "https://cdn.example.com/10.jpg",
+  ]
+
+ ❯ tests/audit-regressions.test.ts:72:18
+     70|     const sent = groups.flatMap(c => c.payload.media.map((m: any) => m…
+     71|     sent.push(...calls.filter(c => c.method === 'sendPhoto').map(c => …
+     72|     expect(sent).toEqual(Array.from({ length: count }, (_, i) => cdn +…
+       |                  ^
+     73|   });
+     74| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/17]⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: media delivery > delivers every item in a 21-item album, including a single-item tail
+AssertionError: expected [ …(10) ] to deeply equal [ …(21) ]
+
+- Expected
++ Received
+
+@@ -7,17 +7,6 @@
+    "https://cdn.example.com/5.jpg",
+    "https://cdn.example.com/6.jpg",
+    "https://cdn.example.com/7.jpg",
+    "https://cdn.example.com/8.jpg",
+    "https://cdn.example.com/9.jpg",
+-   "https://cdn.example.com/10.jpg",
+-   "https://cdn.example.com/11.jpg",
+-   "https://cdn.example.com/12.jpg",
+-   "https://cdn.example.com/13.jpg",
+-   "https://cdn.example.com/14.jpg",
+-   "https://cdn.example.com/15.jpg",
+-   "https://cdn.example.com/16.jpg",
+-   "https://cdn.example.com/17.jpg",
+-   "https://cdn.example.com/18.jpg",
+-   "https://cdn.example.com/19.jpg",
+-   "https://cdn.example.com/20.jpg",
+  ]
+
+ ❯ tests/audit-regressions.test.ts:72:18
+     70|     const sent = groups.flatMap(c => c.payload.media.map((m: any) => m…
+     71|     sent.push(...calls.filter(c => c.method === 'sendPhoto').map(c => …
+     72|     expect(sent).toEqual(Array.from({ length: count }, (_, i) => cdn +…
+       |                  ^
+     73|   });
+     74| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/17]⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: media delivery > offers every failed album item as a download link
+TypeError: Cannot read properties of undefined (reading 'inline_keyboard')
+ ❯ tests/audit-regressions.test.ts:86:72
+     84|     });
+     85|     await bot.handleUpdate(textUpdate('https://instagram.com/p/test/')…
+     86|     const links = calls.find(c => c.method === 'sendMessage')?.payload…
+       |                                                                        ^
+     87|     expect(links).toEqual([cdn + '1.jpg', cdn + '2.jpg']);
+     88|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/17]⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: media delivery > resolves links hidden in a forwarded media caption
+AssertionError: expected "resolveVideo" to be called with arguments: [ 'https://vm.tiktok.com/test/' ]
+
+Number of calls: 0
+
+ ❯ tests/audit-regressions.test.ts:98:21
+     96|       photo: [{ file_id: 'id', file_unique_id: 'unique', width: 100, h…
+     97|     } });
+     98|     expect(resolve).toHaveBeenCalledWith('https://vm.tiktok.com/test/'…
+       |                     ^
+     99|   });
+    100| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/17]⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: media delivery > discovers actual bot identity so addressed commands work for a different bot
+AssertionError: expected false to be true // Object.is equality
+
+- Expected
++ Received
+
+- true
++ false
+
+ ❯ tests/audit-regressions.test.ts:108:51
+    106|       entities: [{ type: 'bot_command', offset: 0, length: 15 }],
+    107|     } });
+    108|     expect(calls.some(c => c.method === 'getMe')).toBe(true);
+       |                                                   ^
+    109|     expect(calls.find(c => c.method === 'sendMessage')?.payload.text).…
+    110|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/17]⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: media delivery > keeps captions within Telegram limits when the scraper returns an enormous author
+AssertionError: expected 5218 to be less than 1024
+ ❯ tests/audit-regressions.test.ts:114:74
+    112|   it('keeps captions within Telegram limits when the scraper returns a…
+    113|     const caption = formatCaption({ platform: 'tiktok', directUrl: cdn…
+    114|     expect(caption.replace(/<[^>]*>/g, '').replace(/&lt;/g, '<').lengt…
+       |                                                                          ^
+    115|   });
+    116| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/17]⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: HTTP and parsing > bounds a JSON body that stalls after response headers
+TypeError: (0 , fetchJsonWithTimeout) is not a function
+ ❯ tests/audit-regressions.test.ts:123:21
+    121|     const fetch = vi.fn().mockResolvedValue({ json: () => new Promise(…
+    122|     vi.stubGlobal('fetch', fetch);
+    123|     const pending = fetchJsonWithTimeout('https://example.com', { time…
+       |                     ^
+    124|     const rejected = expect(pending).rejects.toThrow('timed out');
+    125|     await vi.advanceTimersByTimeAsync(50);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/17]⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: HTTP and parsing > preserves caller cancellation during JSON reads
+TypeError: (0 , fetchJsonWithTimeout) is not a function
+ ❯ tests/audit-regressions.test.ts:134:21
+    132|     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ json: () => new…
+    133|     const controller = new AbortController();
+    134|     const pending = fetchJsonWithTimeout('https://example.com', { sign…
+       |                     ^
+    135|     controller.abort(new Error('caller cancelled'));
+    136|     await expect(pending).rejects.toThrow('caller cancelled');
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/17]⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: HTTP and parsing > does not return a video-only local-processing tunnel as a complete video
+AssertionError: expected ResolverError: Failed to extract video st… { …(2) } to match object { code: 'UNSUPPORTED' }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+- {
+-   "code": "UNSUPPORTED",
++ ResolverError {
++   "code": "UNKNOWN",
+  }
+
+ ❯ tests/audit-regressions.test.ts:142:5
+    140|     const fetch = vi.fn().mockResolvedValue(jsonResponse({ status: 'lo…
+    141|     vi.stubGlobal('fetch', fetch);
+    142|     await expect(new YouTubeResolver().resolve('https://youtube.com/sh…
+       |     ^
+    143|     expect(JSON.parse(fetch.mock.calls[0]?.[1].body).localProcessing).…
+    144|   });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/17]⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: HTTP and parsing > retains a single Cobalt picker photo type
+AssertionError: expected { …(3) } to match object { mediaType: 'photo' }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+  {
+-   "mediaType": "photo",
++   "audioUrl": undefined,
++   "directUrl": "https://cdn.example.com/photo.jpg",
++   "platform": "instagram",
+  }
+
+ ❯ tests/audit-regressions.test.ts:148:83
+    146|   it('retains a single Cobalt picker photo type', async () => {
+    147|     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({ st…
+    148|     expect(await new InstagramResolver().resolve('https://instagram.co…
+       |                                                                                   ^
+    149|   });
+    150| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/17]⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: HTTP and parsing > classifies TikWM HTTP 429 correctly
+AssertionError: expected ResolverError: TikWM API responded with H… { …(2) } to match object { code: 'RATE_LIMITED' }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+- {
+-   "code": "RATE_LIMITED",
++ ResolverError {
++   "code": "UNKNOWN",
+  }
+
+ ❯ tests/audit-regressions.test.ts:153:5
+    151|   it.each([429, 503])('classifies TikWM HTTP %i correctly', async (sta…
+    152|     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(jsonResponse({}, …
+    153|     await expect(new TikTokResolver().resolve('https://vm.tiktok.com/t…
+       |     ^
+    154|   });
+    155| 
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/17]⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: HTTP and parsing > classifies Cobalt HTTP 429 even with a non-JSON body
+AssertionError: expected ResolverError: Cobalt API returned invali… { …(2) } to match object { code: 'RATE_LIMITED' }
+(3 matching properties omitted from actual)
+
+- Expected
++ Received
+
+- {
+-   "code": "RATE_LIMITED",
++ ResolverError {
++   "code": "SCRAPER_DOWN",
+  }
+
+ ❯ tests/audit-regressions.test.ts:158:5
+    156|   it.each([429, 503])('classifies Cobalt HTTP %i even with a non-JSON …
+    157|     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('tem…
+    158|     await expect(new YouTubeResolver().resolve('https://youtube.com/sh…
+       |     ^
+    159|   });
+    160| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/17]⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: LRU > updates an existing key at capacity without evicting an unrelated key
+AssertionError: expected undefined to be 'a' // Object.is equality
+
+- Expected: 
+"a"
+
++ Received: 
+undefined
+
+ ❯ tests/audit-regressions.test.ts:166:28
+    164|     const cache = new MemoryCache<string>(2, 1000);
+    165|     cache.set('a', 'a'); cache.set('b', 'b'); cache.set('b', 'new');
+    166|     expect(cache.get('a')).toBe('a'); expect(cache.get('b')).toBe('new…
+       |                            ^
+    167|   });
+    168|   it('expires at the exact TTL boundary', () => {
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/17]⎯
+
+ FAIL  tests/audit-regressions.test.ts > Audit: LRU > expires at the exact TTL boundary
+AssertionError: expected 'a' to be undefined
+
+- Expected: 
+undefined
+
++ Received: 
+"a"
+
+ ❯ tests/audit-regressions.test.ts:172:28
+    170|     const cache = new MemoryCache<string>(2, 50);
+    171|     cache.set('a', 'a'); vi.advanceTimersByTime(50);
+    172|     expect(cache.get('a')).toBeUndefined();
+       |                            ^
+    173|   });
+    174| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/17]⎯
+
+ FAIL  tests/webhook-completion.test.ts > does not acknowledge an unfinished update at 9 seconds (web adapter)
+AssertionError: expected true to be false // Object.is equality
+
+- Expected
++ Received
+
+- false
++ true
+
+ ❯ tests/webhook-completion.test.ts:31:24
+     29|   promise.then(() => { acknowledged = true; });
+     30|   await vi.advanceTimersByTimeAsync(9100);
+     31|   expect(acknowledged).toBe(false);
+       |                        ^
+     32|   expect(delivered).toBe(false);
+     33|   await vi.advanceTimersByTimeAsync(1000);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/17]⎯
+
+ FAIL  tests/webhook-completion.test.ts > does not acknowledge an unfinished update at 9 seconds (node adapter)
+TypeError: req.on is not a function
+ ❯ ../../../../../../../Users/pro/telegram-video-bot/node_modules/.pnpm/grammy@1.46.0/node_modules/grammy/out/convenience/frameworks.js:206:21
+ ❯ Object.get update [as update] ../../../../../../../Users/pro/telegram-video-bot/node_modules/.pnpm/grammy@1.46.0/node_modules/grammy/out/convenience/frameworks.js:204:20
+ ❯ ../../../../../../../Users/pro/telegram-video-bot/node_modules/.pnpm/grammy@1.46.0/node_modules/grammy/out/convenience/webhook.js:88:65
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/17]⎯
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+
+⎯⎯⎯⎯ Unhandled Rejection ⎯⎯⎯⎯⎯
+TypeError: req.on is not a function
+ ❯ ../../../../../../../Users/pro/telegram-video-bot/node_modules/.pnpm/grammy@1.46.0/node_modules/grammy/out/convenience/frameworks.js:206:21
+ ❯ Object.get update [as update] ../../../../../../../Users/pro/telegram-video-bot/node_modules/.pnpm/grammy@1.46.0/node_modules/grammy/out/convenience/frameworks.js:204:20
+ ❯ ../../../../../../../Users/pro/telegram-video-bot/node_modules/.pnpm/grammy@1.46.0/node_modules/grammy/out/convenience/webhook.js:88:65
+
+This error originated in "tests/webhook-completion.test.ts" test file. It doesn't mean the error was thrown inside the file itself, but while it was running.
+The latest test that might've caused the error is "does not acknowledge an unfinished update at 9 seconds (node adapter)". It might mean one of the following:
+- The error was thrown, while Vitest was running this test.
+- If the error occurred after the test had been completed, this was the last documented test before it was thrown.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+
+
+ Test Files  2 failed (2)
+      Tests  17 failed | 2 passed (19)
+     Errors  1 error
+   Start at  23:28:17
+   Duration  343ms (transform 125ms, setup 0ms, collect 199ms, tests 26ms, environment 0ms, prepare 87ms)
+

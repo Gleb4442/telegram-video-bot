@@ -1,3 +1,4 @@
+import { safeErrorCode } from '../src/utils/errors.js';
 import { Bot } from 'grammy';
 import { getConfig } from '../src/config.js';
 
@@ -70,12 +71,12 @@ Or set the WEBHOOK_URL environment variable:
 
     console.log('\n🎉 Bot is ready to receive updates on Vercel!');
   } catch (error: unknown) {
-    console.error('❌ Failed to set webhook:', error);
+    console.error('❌ Failed to set webhook:', safeErrorCode(error));
     process.exit(1);
   }
 }
 
 main().catch((err) => {
-  console.error('Fatal error running set-webhook:', err);
+  console.error('Fatal error running set-webhook:', safeErrorCode(err));
   process.exit(1);
 });

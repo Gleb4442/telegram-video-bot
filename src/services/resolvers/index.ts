@@ -1,25 +1,26 @@
-import { ResolvedVideo, ResolverError, VideoResolver } from '../../types/resolver.js';
-import { MemoryCache } from '../../utils/cache.js';
-import { TikTokResolver, TIKTOK_URL_REGEX } from './tiktok.js';
+import { getConfig } from "../../config.js";
+import {
+  ResolvedVideo,
+  ResolverError,
+  VideoResolver,
+} from "../../types/resolver.js";
+import { MemoryCache } from "../../utils/cache.js";
+import { TikTokResolver } from "./tiktok.js";
 import {
   InstagramResolver,
-  INSTAGRAM_URL_REGEX,
   YouTubeResolver,
-  YOUTUBE_SHORTS_REGEX,
   TwitterResolver,
-  TWITTER_URL_REGEX,
   RedditResolver,
-  REDDIT_URL_REGEX,
   ThreadsResolver,
-  THREADS_URL_REGEX,
   PinterestResolver,
-  PINTEREST_URL_REGEX,
-} from './cobalt.js';
+} from "./cobalt.js";
+import { platformForUrl, validateMedia } from "../../utils/urls.js";
 
 // Global cache for resolved videos (TTL 30 minutes, max 500 items)
-export const videoCache = new MemoryCache<ResolvedVideo>(500, 30 * 60 * 1000);
+export const videoCache = new MemoryCache<ResolvedVideo>(500, 2 * 60 * 1000);
 
 export class ResolverRegistry {
+  private pending = new Map<string, Promise<ResolvedVideo>>();
   private resolvers: VideoResolver[] = [];
 
   constructor() {
@@ -41,7 +42,7 @@ export class ResolverRegistry {
   }
 
   async resolve(url: string): Promise<ResolvedVideo> {
-    const cleanUrl = url.trim();
+    const cleanUrl = canonicalUrl(url);
 
     // Check fast in-memory cache first to save Vercel execution time and avoid rate limits
     const cached = videoCache.get(cleanUrl);
@@ -52,18 +53,24 @@ export class ResolverRegistry {
     const resolver = this.findResolver(cleanUrl);
     if (!resolver) {
       throw new ResolverError(
-        'Unsupported video URL. Supported: TikTok, Instagram, YouTube Shorts, Twitter/X, Reddit, Threads, Pinterest.',
-        'tiktok',
-        'UNSUPPORTED'
+        "Unsupported video URL. Supported: TikTok, Instagram, YouTube Shorts, Twitter/X, Reddit, Threads, Pinterest.",
+        "tiktok",
+        "UNSUPPORTED",
       );
     }
 
-    const resolved = await resolver.resolve(cleanUrl);
-
-    // Store in cache
-    videoCache.set(cleanUrl, resolved);
-
-    return resolved;
+    const existing = this.pending.get(cleanUrl);
+    if (existing) return existing;
+    const task = resolver
+      .resolve(cleanUrl)
+      .then(validateMedia)
+      .then((resolved) => {
+        videoCache.set(cleanUrl, resolved);
+        return resolved;
+      })
+      .finally(() => this.pending.delete(cleanUrl));
+    this.pending.set(cleanUrl, task);
+    return task;
   }
 
   getRegisteredResolvers(): readonly VideoResolver[] {
@@ -83,16 +90,8 @@ export function extractSupportedUrls(text: string): string[] {
 
   const supportedUrls: string[] = [];
   for (const match of matches) {
-    const cleaned = match.replace(/[),.;:!?]+$/, '');
-    if (
-      TIKTOK_URL_REGEX.test(cleaned) ||
-      INSTAGRAM_URL_REGEX.test(cleaned) ||
-      YOUTUBE_SHORTS_REGEX.test(cleaned) ||
-      TWITTER_URL_REGEX.test(cleaned) ||
-      REDDIT_URL_REGEX.test(cleaned) ||
-      THREADS_URL_REGEX.test(cleaned) ||
-      PINTEREST_URL_REGEX.test(cleaned)
-    ) {
+    const cleaned = match.replace(/[),.;:!?]+$/, "");
+    if (platformForUrl(cleaned)) {
       supportedUrls.push(cleaned);
     }
   }
@@ -106,4 +105,31 @@ export async function resolveVideo(url: string): Promise<ResolvedVideo> {
 
 export function findResolver(url: string): VideoResolver | null {
   return defaultRegistry.findResolver(url);
+}
+
+export function canonicalUrl(raw: string): string {
+  const u = new URL(raw.trim());
+  const platform = platformForUrl(raw);
+  if (platform === "instagram" || platform === "tiktok") {
+    u.search = "";
+    u.hash = "";
+  }
+  return u.href;
+}
+
+export async function resolveReliably(url: string): Promise<ResolvedVideo> {
+  try {
+    return await resolveVideo(url);
+  } catch (err) {
+    if (
+      !getConfig().INNGEST_EVENT_KEY ||
+      !(err instanceof ResolverError) ||
+      !["TIMEOUT", "SCRAPER_DOWN", "RATE_LIMITED"].includes(err.code)
+    )
+      throw err;
+    await new Promise((resolve) =>
+      setTimeout(resolve, 1000 + Math.floor(Math.random() * 1000)),
+    );
+    return resolveVideo(url);
+  }
 }

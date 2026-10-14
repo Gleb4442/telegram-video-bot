@@ -1,0 +1,60 @@
+
+> telegram-video-bot@1.0.0 test /Users/pro/telegram-video-bot
+> vitest run
+
+
+ RUN  v3.2.7 /Users/pro/telegram-video-bot
+
+ ✓ tests/cache.test.ts (3 tests) 5ms
+ ✓ tests/regex.test.ts (12 tests) 3ms
+ ✓ tests/webhook-completion.test.ts (3 tests) 8ms
+stderr | tests/resolvers.test.ts > Video Resolvers > Cobalt Resolvers (Multi-platform) > falls back to secondary Cobalt instance when primary returns error.api.youtube.login
+[Cobalt] Instance https://primary-cobalt.example.com returned server restriction (error.api.youtube.login). Trying next instance...
+
+stderr | tests/webhook.test.ts > Webhook Security & Handler > Web Standard Request Mode > rejects POST request with 401 when secret token header is missing
+[Webhook] Unauthorized request: Missing or invalid secret token header.
+
+stderr | tests/webhook.test.ts > Webhook Security & Handler > Web Standard Request Mode > rejects POST request with 401 when secret token header is invalid
+[Webhook] Unauthorized request: Missing or invalid secret token header.
+
+stderr | tests/webhook.test.ts > Webhook Security & Handler > Node.js (VercelRequest, VercelResponse) Mode > rejects requests with missing secret token in Node handler mode
+[Webhook] Unauthorized request: Missing or invalid secret token header.
+
+stderr | tests/bot.test.ts > Bot Handlers and Utilities > Bot Update Processing & Fallback Flow > falls back to inline download button when Telegram sendVideo fails (>20MB limit)
+[Bot] sendMedia failed for youtube (https://www.youtube.com/shorts/dQw4w9WgXcQ), sending inline button fallback: 400 Bad Request: failed to get HTTP URL content
+
+stderr | tests/bot.test.ts > Bot Handlers and Utilities > Bot Update Processing & Fallback Flow > sends polite error message when video is private or deleted
+[Bot] Error resolving media from https://www.instagram.com/reel/PrivateVideo/: ResolverError: Video is private
+    at /Users/pro/telegram-video-bot/tests/bot.test.ts:255:9
+    at file:///Users/pro/telegram-video-bot/node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/dist/chunk-hooks.js:155:11
+    at file:///Users/pro/telegram-video-bot/node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/dist/chunk-hooks.js:752:26
+    at file:///Users/pro/telegram-video-bot/node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/dist/chunk-hooks.js:1897:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///Users/pro/telegram-video-bot/node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/dist/chunk-hooks.js:1863:10)
+    at runTest (file:///Users/pro/telegram-video-bot/node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/dist/chunk-hooks.js:1574:12)
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at runSuite (file:///Users/pro/telegram-video-bot/node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8)
+    at runSuite (file:///Users/pro/telegram-video-bot/node_modules/.pnpm/@vitest+runner@3.2.7/node_modules/@vitest/runner/dist/chunk-hooks.js:1729:8) {
+  platform: 'instagram',
+  code: 'PRIVATE_OR_DELETED',
+  cause: undefined
+}
+
+ ✓ tests/webhook.test.ts (6 tests) 7ms
+ ✓ tests/resolvers.test.ts (12 tests) 7ms
+ ✓ tests/bot.test.ts (11 tests) 13ms
+ ✓ tests/audit-regressions.test.ts (17 tests) 12ms
+
+ Test Files  7 passed (7)
+      Tests  64 passed (64)
+   Start at  23:33:39
+   Duration  434ms (transform 605ms, setup 0ms, collect 952ms, tests 56ms, environment 1ms, prepare 566ms)
+
+
+> telegram-video-bot@1.0.0 typecheck /Users/pro/telegram-video-bot
+> tsc --noEmit
+
+
+> telegram-video-bot@1.0.0 build /Users/pro/telegram-video-bot
+> tsc
+

@@ -1,15 +1,15 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { User, UserFromGetMe } from 'grammy/types';
-import { createBot, escapeHtml, formatCaption } from '../src/bot.js';
-import { ResolvedVideo, ResolverError } from '../src/types/resolver.js';
-import * as resolverModule from '../src/services/resolvers/index.js';
-import { resetConfigForTesting } from '../src/config.js';
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { User, UserFromGetMe } from "grammy/types";
+import { createBot, escapeHtml, formatCaption } from "../src/bot.js";
+import { ResolvedVideo, ResolverError } from "../src/types/resolver.js";
+import * as resolverModule from "../src/services/resolvers/index.js";
+import { resetConfigForTesting } from "../src/config.js";
 
 const mockBotInfo: UserFromGetMe = {
   id: 1234567890,
   is_bot: true,
-  first_name: 'VideoDownloaderBot',
-  username: 'VideoDownloaderBot',
+  first_name: "VideoDownloaderBot",
+  username: "VideoDownloaderBot",
   can_join_groups: true,
   can_read_all_group_messages: false,
   supports_inline_queries: false,
@@ -24,85 +24,96 @@ const mockBotInfo: UserFromGetMe = {
 const mockUser: User = {
   id: 42,
   is_bot: false,
-  first_name: 'Tester',
+  first_name: "Tester",
 };
 
 const mockPrivateChat = {
   id: 42,
-  type: 'private' as const,
-  first_name: 'Tester',
+  type: "private" as const,
+  first_name: "Tester",
 };
 
-describe('Bot Handlers and Utilities', () => {
+describe("Bot Handlers and Utilities", () => {
   beforeEach(() => {
     resetConfigForTesting();
-    process.env['TELEGRAM_BOT_TOKEN'] = '1234567890:ABCdefGHIjklMNOpqrsTUVwxyz';
-    process.env['TELEGRAM_SECRET_TOKEN'] = 'valid_secret_token_123';
+    process.env["TELEGRAM_BOT_TOKEN"] = "1234567890:ABCdefGHIjklMNOpqrsTUVwxyz";
+    process.env["TELEGRAM_SECRET_TOKEN"] = "valid_secret_token_123";
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  describe('escapeHtml', () => {
-    it('escapes &, <, > properly', () => {
-      const input = 'Tom & Jerry <cartoon> > Anime';
-      expect(escapeHtml(input)).toBe('Tom &amp; Jerry &lt;cartoon&gt; &gt; Anime');
+  describe("escapeHtml", () => {
+    it("escapes &, <, > properly", () => {
+      const input = "Tom & Jerry <cartoon> > Anime";
+      expect(escapeHtml(input)).toBe(
+        "Tom &amp; Jerry &lt;cartoon&gt; &gt; Anime",
+      );
     });
   });
 
-  describe('formatCaption', () => {
-    it('formats TikTok caption with author and title', () => {
+  describe("formatCaption", () => {
+    it("formats TikTok caption with author and title", () => {
       const video: ResolvedVideo = {
-        platform: 'tiktok',
-        directUrl: 'https://cdn.example.com/video.mp4',
-        title: 'Hilarious Cat Jump <Fail>',
-        author: 'cat_lover',
+        platform: "tiktok",
+        directUrl: "https://cdn.example.com/video.mp4",
+        title: "Hilarious Cat Jump <Fail>",
+        author: "cat_lover",
       };
 
       const caption = formatCaption(video);
-      expect(caption).toContain('🎵 TikTok');
-      expect(caption).toContain('Hilarious Cat Jump &lt;Fail&gt;');
-      expect(caption).toContain('@cat_lover');
+      expect(caption).toContain("🎵 TikTok");
+      expect(caption).toContain("Hilarious Cat Jump &lt;Fail&gt;");
+      expect(caption).toContain("@cat_lover");
     });
 
-    it('formats Instagram Reel caption', () => {
+    it("formats Instagram Reel caption", () => {
       const video: ResolvedVideo = {
-        platform: 'instagram',
-        directUrl: 'https://cdn.example.com/video.mp4',
-        title: 'Sunset in Bali',
+        platform: "instagram",
+        directUrl: "https://cdn.example.com/video.mp4",
+        title: "Sunset in Bali",
       };
 
       const caption = formatCaption(video);
-      expect(caption).toContain('📸 Instagram');
-      expect(caption).toContain('Sunset in Bali');
+      expect(caption).toContain("📸 Instagram");
+      expect(caption).toContain("Sunset in Bali");
     });
 
-    it('truncates excessively long titles gracefully', () => {
-      const longTitle = 'a'.repeat(300);
+    it("truncates excessively long titles gracefully", () => {
+      const longTitle = "a".repeat(300);
       const video: ResolvedVideo = {
-        platform: 'youtube',
-        directUrl: 'https://cdn.example.com/video.mp4',
+        platform: "youtube",
+        directUrl: "https://cdn.example.com/video.mp4",
         title: longTitle,
       };
 
       const caption = formatCaption(video);
-      expect(caption).toContain('▶️ YouTube Shorts');
-      expect(caption).toContain('...');
+      expect(caption).toContain("▶️ YouTube Shorts");
+      expect(caption).toContain("...");
       expect(caption.length).toBeLessThan(400);
     });
   });
 
-  describe('Bot Update Processing & Fallback Flow', () => {
-    it('handles /start command with informative greeting', async () => {
-      const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
+  describe("Bot Update Processing & Fallback Flow", () => {
+    it("handles /start command with informative greeting", async () => {
+      const bot = createBot("1234567890:ABCdefGHIjklMNOpqrsTUVwxyz");
       bot.botInfo = mockBotInfo;
 
-      let sentMessage = '';
+      let sentMessage = "";
       bot.api.config.use((_prev, method, payload: any) => {
-        if (method === 'sendMessage') {
+        if (method === "sendMessage") {
           sentMessage = payload.text;
-          return { ok: true, result: { message_id: 101, date: 1, chat: mockPrivateChat, from: mockUser, text: payload.text } } as any;
+          return {
+            ok: true,
+            result: {
+              message_id: 101,
+              date: 1,
+              chat: mockPrivateChat,
+              from: mockUser,
+              text: payload.text,
+            },
+          } as any;
         }
         return { ok: true, result: true } as any;
       });
@@ -114,26 +125,37 @@ describe('Bot Handlers and Utilities', () => {
           date: 1,
           chat: mockPrivateChat,
           from: mockUser,
-          text: '/start',
-          entities: [{ type: 'bot_command', offset: 0, length: 6 }],
+          text: "/start",
+          entities: [{ type: "bot_command", offset: 0, length: 6 }],
         },
       });
 
-      expect(sentMessage).toContain('Добро пожаловать в Universal Media Downloader');
-      expect(sentMessage).toContain('TikTok');
-      expect(sentMessage).toContain('Instagram');
-      expect(sentMessage).toContain('YouTube Shorts');
+      expect(sentMessage).toContain(
+        "Добро пожаловать в Universal Media Downloader",
+      );
+      expect(sentMessage).toContain("TikTok");
+      expect(sentMessage).toContain("Instagram");
+      expect(sentMessage).toContain("YouTube Shorts");
     });
 
-    it('handles /help command with instructions', async () => {
-      const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
+    it("handles /help command with instructions", async () => {
+      const bot = createBot("1234567890:ABCdefGHIjklMNOpqrsTUVwxyz");
       bot.botInfo = mockBotInfo;
 
-      let sentMessage = '';
+      let sentMessage = "";
       bot.api.config.use((_prev, method, payload: any) => {
-        if (method === 'sendMessage') {
+        if (method === "sendMessage") {
           sentMessage = payload.text;
-          return { ok: true, result: { message_id: 101, date: 1, chat: mockPrivateChat, from: mockUser, text: payload.text } } as any;
+          return {
+            ok: true,
+            result: {
+              message_id: 101,
+              date: 1,
+              chat: mockPrivateChat,
+              from: mockUser,
+              text: payload.text,
+            },
+          } as any;
         }
         return { ok: true, result: true } as any;
       });
@@ -145,43 +167,51 @@ describe('Bot Handlers and Utilities', () => {
           date: 1,
           chat: mockPrivateChat,
           from: mockUser,
-          text: '/help',
-          entities: [{ type: 'bot_command', offset: 0, length: 5 }],
+          text: "/help",
+          entities: [{ type: "bot_command", offset: 0, length: 5 }],
         },
       });
 
-      expect(sentMessage).toContain('Поддерживаемые платформы');
-      expect(sentMessage).toContain('TikTok');
-      expect(sentMessage).toContain('Instagram');
-      expect(sentMessage).toContain('YouTube Shorts');
+      expect(sentMessage).toContain("Поддерживаемые платформы");
+      expect(sentMessage).toContain("TikTok");
+      expect(sentMessage).toContain("Instagram");
+      expect(sentMessage).toContain("YouTube Shorts");
     });
 
-    it('sends direct video with streaming support when resolution succeeds', async () => {
-      const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
+    it("sends direct video with streaming support when resolution succeeds", async () => {
+      const bot = createBot("1234567890:ABCdefGHIjklMNOpqrsTUVwxyz");
       bot.botInfo = mockBotInfo;
 
-      vi.spyOn(resolverModule, 'resolveVideo').mockResolvedValue({
-        platform: 'tiktok',
-        directUrl: 'https://v16.tiktokcdn.com/clean-video.mp4',
-        title: 'Awesome Dance Move',
-        author: 'dancer123',
+      vi.spyOn(resolverModule, "resolveVideo").mockResolvedValue({
+        platform: "tiktok",
+        directUrl: "https://v16.tiktokcdn.com/clean-video.mp4",
+        title: "Awesome Dance Move",
+        author: "dancer123",
       });
 
-      let sentVideoUrl = '';
-      let chatActionSent = '';
+      let sentVideoUrl = "";
+      let chatActionSent = "";
       let supportsStreaming = false;
       let replyMarkup: any = null;
 
       bot.api.config.use((_prev, method, payload: any) => {
-        if (method === 'sendChatAction') {
+        if (method === "sendChatAction") {
           chatActionSent = payload.action;
           return { ok: true, result: true } as any;
         }
-        if (method === 'sendVideo') {
+        if (method === "sendVideo") {
           sentVideoUrl = payload.video;
           supportsStreaming = payload.supports_streaming;
           replyMarkup = payload.reply_markup;
-          return { ok: true, result: { message_id: 102, date: 1, chat: mockPrivateChat, from: mockUser } } as any;
+          return {
+            ok: true,
+            result: {
+              message_id: 102,
+              date: 1,
+              chat: mockPrivateChat,
+              from: mockUser,
+            },
+          } as any;
         }
         return { ok: true, result: true } as any;
       });
@@ -193,40 +223,53 @@ describe('Bot Handlers and Utilities', () => {
           date: 1,
           chat: mockPrivateChat,
           from: mockUser,
-          text: 'Check this: https://vm.tiktok.com/ZM8xyZ123/',
+          text: "Check this: https://vm.tiktok.com/ZM8xyZ123/",
         },
       });
 
-      expect(chatActionSent).toBe('upload_video');
-      expect(sentVideoUrl).toBe('https://v16.tiktokcdn.com/clean-video.mp4');
+      expect(chatActionSent).toBe("upload_video");
+      expect(sentVideoUrl).toBe("https://v16.tiktokcdn.com/clean-video.mp4");
       expect(supportsStreaming).toBe(true);
-      expect(replyMarkup?.inline_keyboard?.[0]?.[0]?.text).toContain('Скачать в HD');
+      expect(replyMarkup?.inline_keyboard?.[0]?.[0]?.text).toContain(
+        "Скачать оригинал",
+      );
     });
 
-    it('falls back to inline download button when Telegram sendVideo fails (>20MB limit)', async () => {
-      const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
+    it("falls back to inline download button when Telegram sendVideo fails (>20MB limit)", async () => {
+      const bot = createBot("1234567890:ABCdefGHIjklMNOpqrsTUVwxyz");
       bot.botInfo = mockBotInfo;
 
-      vi.spyOn(resolverModule, 'resolveVideo').mockResolvedValue({
-        platform: 'youtube',
-        directUrl: 'https://rr1---sn.googlevideo.com/large-video.mp4',
-        title: 'High Resolution YouTube Short',
+      vi.spyOn(resolverModule, "resolveVideo").mockResolvedValue({
+        platform: "youtube",
+        directUrl: "https://rr1---sn.googlevideo.com/large-video.mp4",
+        title: "High Resolution YouTube Short",
       });
 
-      let fallbackText = '';
+      let fallbackText = "";
       let inlineKeyboardButtons: any = null;
 
       bot.api.config.use((_prev, method, payload: any) => {
-        if (method === 'sendVideo') {
-          const error = new Error('400 Bad Request: failed to get HTTP URL content');
+        if (method === "sendVideo") {
+          const error = new Error(
+            "400 Bad Request: failed to get HTTP URL content",
+          );
           (error as any).error_code = 400;
-          (error as any).description = 'failed to get HTTP URL content';
+          (error as any).description = "failed to get HTTP URL content";
           throw error;
         }
-        if (method === 'sendMessage') {
+        if (method === "sendMessage") {
           fallbackText = payload.text;
           inlineKeyboardButtons = payload.reply_markup;
-          return { ok: true, result: { message_id: 103, date: 1, chat: mockPrivateChat, from: mockUser, text: payload.text } } as any;
+          return {
+            ok: true,
+            result: {
+              message_id: 103,
+              date: 1,
+              chat: mockPrivateChat,
+              from: mockUser,
+              text: payload.text,
+            },
+          } as any;
         }
         return { ok: true, result: true } as any;
       });
@@ -238,28 +281,43 @@ describe('Bot Handlers and Utilities', () => {
           date: 1,
           chat: mockPrivateChat,
           from: mockUser,
-          text: 'https://www.youtube.com/shorts/dQw4w9WgXcQ',
+          text: "https://www.youtube.com/shorts/dQw4w9WgXcQ",
         },
       });
 
-      expect(fallbackText).toContain('превышает лимит');
+      expect(fallbackText).toContain("превышает лимит");
       expect(inlineKeyboardButtons).toBeDefined();
-      expect(inlineKeyboardButtons.inline_keyboard[0][0].url).toBe('https://rr1---sn.googlevideo.com/large-video.mp4');
+      expect(inlineKeyboardButtons.inline_keyboard[0][0].url).toBe(
+        "https://rr1---sn.googlevideo.com/large-video.mp4",
+      );
     });
 
-    it('sends polite error message when video is private or deleted', async () => {
-      const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
+    it("sends polite error message when video is private or deleted", async () => {
+      const bot = createBot("1234567890:ABCdefGHIjklMNOpqrsTUVwxyz");
       bot.botInfo = mockBotInfo;
 
-      vi.spyOn(resolverModule, 'resolveVideo').mockRejectedValue(
-        new ResolverError('Video is private', 'instagram', 'PRIVATE_OR_DELETED')
+      vi.spyOn(resolverModule, "resolveVideo").mockRejectedValue(
+        new ResolverError(
+          "Video is private",
+          "instagram",
+          "PRIVATE_OR_DELETED",
+        ),
       );
 
-      let errorMessage = '';
+      let errorMessage = "";
       bot.api.config.use((_prev, method, payload: any) => {
-        if (method === 'sendMessage') {
+        if (method === "sendMessage") {
           errorMessage = payload.text;
-          return { ok: true, result: { message_id: 104, date: 1, chat: mockPrivateChat, from: mockUser, text: payload.text } } as any;
+          return {
+            ok: true,
+            result: {
+              message_id: 104,
+              date: 1,
+              chat: mockPrivateChat,
+              from: mockUser,
+              text: payload.text,
+            },
+          } as any;
         }
         return { ok: true, result: true } as any;
       });
@@ -271,32 +329,35 @@ describe('Bot Handlers and Utilities', () => {
           date: 1,
           chat: mockPrivateChat,
           from: mockUser,
-          text: 'https://www.instagram.com/reel/PrivateVideo/',
+          text: "https://www.instagram.com/reel/PrivateVideo/",
         },
       });
 
-      expect(errorMessage).toContain('приватный');
+      expect(errorMessage).toContain("приватный");
     });
-    it('sends replyWithMediaGroup when resolved media is an album/carousel', async () => {
-      const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
+    it("sends replyWithMediaGroup when resolved media is an album/carousel", async () => {
+      const bot = createBot("1234567890:ABCdefGHIjklMNOpqrsTUVwxyz");
       bot.botInfo = mockBotInfo;
 
-      vi.spyOn(resolverModule, 'resolveVideo').mockResolvedValue({
-        platform: 'instagram',
-        directUrl: 'https://cdn.example.com/item1.jpg',
-        title: 'Instagram 2-photo Carousel',
+      vi.spyOn(resolverModule, "resolveVideo").mockResolvedValue({
+        platform: "instagram",
+        directUrl: "https://cdn.example.com/item1.jpg",
+        title: "Instagram 2-photo Carousel",
         isAlbum: true,
         albumItems: [
-          { type: 'photo', url: 'https://cdn.example.com/item1.jpg' },
-          { type: 'photo', url: 'https://cdn.example.com/item2.jpg' },
+          { type: "photo", url: "https://cdn.example.com/item1.jpg" },
+          { type: "photo", url: "https://cdn.example.com/item2.jpg" },
         ],
       });
 
       let sentMediaGroup: any = null;
       bot.api.config.use((_prev, method, payload: any) => {
-        if (method === 'sendMediaGroup') {
+        if (method === "sendMediaGroup") {
           sentMediaGroup = payload.media;
-          return { ok: true, result: [{ message_id: 105, date: 1, chat: mockPrivateChat }] } as any;
+          return {
+            ok: true,
+            result: [{ message_id: 105, date: 1, chat: mockPrivateChat }],
+          } as any;
         }
         return { ok: true, result: true } as any;
       });
@@ -308,30 +369,39 @@ describe('Bot Handlers and Utilities', () => {
           date: 1,
           chat: mockPrivateChat,
           from: mockUser,
-          text: 'https://www.instagram.com/p/C3zYAbCdEfG/',
+          text: "https://www.instagram.com/p/C3zYAbCdEfG/",
         },
       });
 
       expect(sentMediaGroup).toHaveLength(2);
-      expect(sentMediaGroup[0].type).toBe('photo');
-      expect(sentMediaGroup[0].media).toBe('https://cdn.example.com/item1.jpg');
+      expect(sentMediaGroup[0].type).toBe("photo");
+      expect(sentMediaGroup[0].media).toBe("https://cdn.example.com/item1.jpg");
     });
-    it('handles /settings command and toggles clean mode and document format', async () => {
-      const bot = createBot('1234567890:ABCdefGHIjklMNOpqrsTUVwxyz');
+    it("handles /settings command and toggles clean mode and document format", async () => {
+      const bot = createBot("1234567890:ABCdefGHIjklMNOpqrsTUVwxyz");
       bot.botInfo = mockBotInfo;
 
-      let settingsMessage = '';
+      let settingsMessage = "";
       let replyMarkup: any = null;
       bot.api.config.use((_prev, method, payload: any) => {
-        if (method === 'sendMessage') {
+        if (method === "sendMessage") {
           settingsMessage = payload.text;
           replyMarkup = payload.reply_markup;
-          return { ok: true, result: { message_id: 106, date: 1, chat: mockPrivateChat, from: mockUser, text: payload.text } } as any;
+          return {
+            ok: true,
+            result: {
+              message_id: 106,
+              date: 1,
+              chat: mockPrivateChat,
+              from: mockUser,
+              text: payload.text,
+            },
+          } as any;
         }
-        if (method === 'editMessageReplyMarkup') {
+        if (method === "editMessageReplyMarkup") {
           return { ok: true, result: true } as any;
         }
-        if (method === 'answerCallbackQuery') {
+        if (method === "answerCallbackQuery") {
           return { ok: true, result: true } as any;
         }
         return { ok: true, result: true } as any;
@@ -344,23 +414,25 @@ describe('Bot Handlers and Utilities', () => {
           date: 1,
           chat: mockPrivateChat,
           from: mockUser,
-          text: '/settings',
-          entities: [{ type: 'bot_command', offset: 0, length: 9 }],
+          text: "/settings",
+          entities: [{ type: "bot_command", offset: 0, length: 9 }],
         },
       });
 
-      expect(settingsMessage).toContain('Настройки скачивания');
-      expect(replyMarkup?.inline_keyboard?.[0]?.[0]?.text).toContain('Формат: Видео');
+      expect(settingsMessage).toContain("Настройки скачивания");
+      expect(replyMarkup?.inline_keyboard?.[0]?.[0]?.text).toContain(
+        "Формат: Видео",
+      );
 
       // Click callback query to enable cleanMode (disable caption)
       await bot.handleUpdate({
         update_id: 7,
         callback_query: {
-          id: 'cb_1',
+          id: "cb_1",
           from: mockUser,
           message: { message_id: 106, date: 1, chat: mockPrivateChat },
-          data: 'pref_toggle_caption',
-          chat_instance: '123',
+          data: "pref_toggle_caption",
+          chat_instance: "123",
         },
       });
 
@@ -368,28 +440,36 @@ describe('Bot Handlers and Utilities', () => {
       await bot.handleUpdate({
         update_id: 8,
         callback_query: {
-          id: 'cb_2',
+          id: "cb_2",
           from: mockUser,
           message: { message_id: 106, date: 1, chat: mockPrivateChat },
-          data: 'pref_toggle_doc',
-          chat_instance: '123',
+          data: "pref_toggle_doc",
+          chat_instance: "123",
         },
       });
 
       // Now send a video link: should be sent via sendDocument WITHOUT caption!
-      vi.spyOn(resolverModule, 'resolveVideo').mockResolvedValue({
-        platform: 'tiktok',
-        directUrl: 'https://v16.tiktokcdn.com/clean.mp4',
-        title: 'Video Title That Should Be Omitted in Clean Mode',
+      vi.spyOn(resolverModule, "resolveVideo").mockResolvedValue({
+        platform: "tiktok",
+        directUrl: "https://v16.tiktokcdn.com/clean.mp4",
+        title: "Video Title That Should Be Omitted in Clean Mode",
       });
 
       let sentAsDocument = false;
-      let documentCaption: string | undefined = 'initial';
+      let documentCaption: string | undefined = "initial";
       bot.api.config.use((_prev, method, payload: any) => {
-        if (method === 'sendDocument') {
+        if (method === "sendDocument") {
           sentAsDocument = true;
           documentCaption = payload.caption;
-          return { ok: true, result: { message_id: 107, date: 1, chat: mockPrivateChat, from: mockUser } } as any;
+          return {
+            ok: true,
+            result: {
+              message_id: 107,
+              date: 1,
+              chat: mockPrivateChat,
+              from: mockUser,
+            },
+          } as any;
         }
         return { ok: true, result: true } as any;
       });
@@ -401,7 +481,7 @@ describe('Bot Handlers and Utilities', () => {
           date: 1,
           chat: mockPrivateChat,
           from: mockUser,
-          text: 'https://vm.tiktok.com/ZM8xyZ123/',
+          text: "https://vm.tiktok.com/ZM8xyZ123/",
         },
       });
 

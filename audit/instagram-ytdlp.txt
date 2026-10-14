@@ -1,0 +1,1 @@
+zsh:1: bad CPU type in executable: yt-dlp

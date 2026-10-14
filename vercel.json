@@ -2,7 +2,13 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/webhook.ts": {
-      "maxDuration": 15
+      "maxDuration": 60,
+      "includeFiles": "node_modules/curl-cffi-node/**/*.node"
+    },
+    "api/inngest.ts": {
+      "maxDuration": 300,
+      "includeFiles": "node_modules/curl-cffi-node/**/*.node"
     }
-  }
+  },
+  "fluid": true
 }

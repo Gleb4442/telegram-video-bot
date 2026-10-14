@@ -13,7 +13,7 @@ export class MemoryCache<T> {
 
   constructor(
     private readonly maxEntries: number = 500,
-    private readonly defaultTtlMs: number = 30 * 60 * 1000 // 30 minutes
+    private readonly defaultTtlMs: number = 30 * 60 * 1000, // 30 minutes
   ) {}
 
   get(key: string): T | undefined {
@@ -22,7 +22,7 @@ export class MemoryCache<T> {
       return undefined;
     }
 
-    if (Date.now() > entry.expiresAt) {
+    if (Date.now() >= entry.expiresAt) {
       this.store.delete(key);
       return undefined;
     }
@@ -34,10 +34,11 @@ export class MemoryCache<T> {
   }
 
   set(key: string, value: T, ttlMs?: number): void {
+    this.store.delete(key);
     // Evict oldest entry if limit reached
     if (this.store.size >= this.maxEntries) {
       const oldestKey = this.store.keys().next().value;
-      if (oldestKey) {
+      if (oldestKey !== undefined) {
         this.store.delete(oldestKey);
       }
     }
