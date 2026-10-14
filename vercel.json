@@ -3,11 +3,11 @@
   "functions": {
     "api/webhook.ts": {
       "maxDuration": 60,
-      "includeFiles": "node_modules/curl-cffi-node/**/*.node"
+      "includeFiles": "node_modules/.pnpm/curl-cffi-node@0.1.8/node_modules/curl-cffi-node/*.node"
     },
     "api/inngest.ts": {
       "maxDuration": 300,
-      "includeFiles": "node_modules/curl-cffi-node/**/*.node"
+      "includeFiles": "node_modules/.pnpm/curl-cffi-node@0.1.8/node_modules/curl-cffi-node/*.node"
     }
   },
   "fluid": true

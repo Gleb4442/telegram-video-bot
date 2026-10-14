@@ -13,6 +13,9 @@ importers:
 
   .:
     dependencies:
+      '@grammyjs/types':
+        specifier: 5.0.0
+        version: 5.0.0
       '@upstash/redis':
         specifier: ^1.39.0
         version: 1.39.0

@@ -1,5 +1,5 @@
 import { Inngest } from "inngest";
-import type { Update } from "grammy/types";
+import type { Update } from "@grammyjs/types";
 import { getBot } from "../bot.js";
 import { getConfig } from "../config.js";
 import { redis, namespace } from "../storage/state.js";

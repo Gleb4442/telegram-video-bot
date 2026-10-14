@@ -1,0 +1,24 @@
+
+> telegram-video-bot@1.0.0 test /Users/pro/telegram-video-bot
+> vitest run
+
+
+ RUN  v5.0.4 /Users/pro/telegram-video-bot
+
+
+ Test Files  13 passed (13)
+      Tests  121 passed (121)
+   Start at  01:55:23
+   Duration  4.37s (import 48%, tests 38%, transform 13%, worker 1%)
+
+    Isolate  13 workers spawned · ~733ms startup each (spawn + environment, per file)
+             at least ~326ms faster with isolate: false — reuses workers across files instead of one per file
+
+
+> telegram-video-bot@1.0.0 typecheck /Users/pro/telegram-video-bot
+> tsc --noEmit
+
+
+> telegram-video-bot@1.0.0 build /Users/pro/telegram-video-bot
+> tsc
+

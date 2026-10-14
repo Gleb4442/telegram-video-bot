@@ -1,5 +1,5 @@
 import { timingSafeEqual } from "node:crypto";
-import type { Update } from "grammy/types";
+import type { Update } from "@grammyjs/types";
 import { enqueueUpdate } from "../src/services/jobs.js";
 import type { VercelRequest, VercelResponse } from "../src/types/vercel.js";
 import { webhookCallback } from "grammy";
