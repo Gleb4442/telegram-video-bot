@@ -1,6 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
+    "api/instagram-check.ts": {
+      "maxDuration": 60,
+      "includeFiles": "node_modules/.pnpm/curl-cffi-node@0.1.8/node_modules/curl-cffi-node/*.node"
+    },
     "api/webhook.ts": {
       "maxDuration": 60,
       "includeFiles": "node_modules/.pnpm/curl-cffi-node@0.1.8/node_modules/curl-cffi-node/*.node"
