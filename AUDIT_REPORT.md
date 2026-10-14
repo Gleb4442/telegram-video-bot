@@ -1,10 +1,10 @@
-# Аудит Telegram media downloader — итог локальных исправлений
+# Аудит Telegram media downloader — исправления и production-проверка
 
 **Проект:** `/Users/pro/telegram-video-bot` (Desktop symlink). **Период:** 14–15 октября 2026.
-**Стек:** TypeScript/grammY, Vercel Node 24+; TikWM/Cobalt; новый optional serverless режим Inngest Free + Upstash Redis Free.
+**Стек:** TypeScript/grammY, Vercel Node 24 + Python 3.12; direct Instagram/TikWM/Cobalt; новый optional serverless режим Inngest Free + Upstash Redis Free.
 **Объём:** все входы, конфигурация, сообщения/captions/inline/settings/albums/errors, webhook/polling/scripts, resolver/provider контракты, кеши, зависимости, секреты, загрузка/отправка, бесплатный хостинг и concurrency.
 
-**36 подтверждённых находок: 35 исправлены локально, 1 требует внешнего действия (C01).** Исправления approved пользователем. Код не развёрнут; новые credentials/сервисы не подключены. Формулировка «исправлено» относится к локальному коду, а не к уже действующему production.
+**36 подтверждённых находок: 35 исправлены локально, 1 требует внешнего действия (C01).** Исправления approved пользователем. Код развёрнут в production 15 октября 2026: `1df3349`, [Vercel deployment](https://vercel.com/glebw2008-7382s-projects/telegram-video-bot/sApzHvg4hM1Lqyn1juVtkxCd3Pim). Извлечение + реальное скачивание Instagram MP4 проверены с Vercel. Inngest/Upstash credentials не добавлялись; сейчас действует bounded synchronous mode, durable guarantees не активированы.
 
 Главный результат: файлы загружаются multipart вместо URL; это поднимает путь отправки с 20 до 50 МБ. Ограничения 10 минут в коде нет. Для файла выше 50 МБ бот пробует меньший источник; если он недоступен или тоже велик, остаётся оригинальная ссылка. Бесплатный вариант не даёт нативную отправку произвольных файлов до 2 ГБ: Telegram разрешает её через отдельный Local Bot API server, который противоречит условию «без отдельного сервера».
 
@@ -250,7 +250,7 @@
 - **Причина / воспроизведение / влияние:** На 2 публичных reels оба endpoints вернули 400 error.api.fetch.empty.
 - **Причина:** Cobalt 11.7.1 (`a636575`) использует старую shortcode GraphQL query и embed. На публичном `DeXA5froeiC` оба instances возвращали `fetch.empty`; обычный Node fetch с новой query тоже получал HTML. Современная numeric-media-id query с browser-compatible TLS/HTTP2 возвращает progressive video streams. Отдельный `Dd-4gKENRms` имеет явный age gate (gating_type=3), подтверждённый браузером.
 - **Исправление:** Прямой anonymous Instagram extractor с текущей query и curl-impersonate transport в приватной Python-функции того же Vercel проекта; Cobalt остаётся резервом. Проверка ID поста, безопасных URL, смешанных альбомов, отсутствующих video streams; age gate получает отдельное сообщение. Аккаунт Instagram и платные сервисы не подключались.
-- **Статус:** Fixed / Verified локально реальным скачиванием `DeXA5froeiC` через код приложения: 10 404 586 байт, 106.14 секунды, H.264 + AAC. Анонимное скачивание age-gated ролика не заявляется исправленным: Instagram требует авторизацию.
+- **Статус:** Fixed / Verified локально реальным скачиванием `DeXA5froeiC` через код приложения: 10 404 586 байт, 106.14 секунды, H.264 + AAC. Production-проверка через закрытый endpoint: HTTP 200, 10 404 586 байт, MP4, 1408 мс. Второй ролик возвращает отдельный AGE_RESTRICTED за 770 мс. Анонимное скачивание age-gated ролика не заявляется исправленным: Instagram требует авторизацию.
 - **Тесты:** `tests/instagram.test.ts`; `scripts/probe-instagram-direct.ts`; `audit/instagram-direct-live.jsonl`.
 
 ### [R10] Короткое окно ответа холодного scraper — Medium

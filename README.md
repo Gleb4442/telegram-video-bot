@@ -4,7 +4,7 @@ Downloads public TikTok, Instagram, YouTube, Twitter/X, Reddit, Threads and Pint
 
 ## Runtime
 
-Node.js 24+, pnpm 10.33.0. Copy `.env.example` to `.env`, set the Telegram token and webhook secret.
+Node.js 24.x, Python 3.12 (Instagram function), pnpm 10.33.0. Copy `.env.example` to `.env`, set the Telegram token and webhook secret.
 
 ```sh
 pnpm install --frozen-lockfile
@@ -25,6 +25,7 @@ flowchart LR
   Webhook --> Queue[Inngest durable events]
   Queue --> Function[Vercel processing function]
   Function --> Scrapers[TikWM / configured Cobalt services]
+  Function --> Instagram[Private Python Instagram function]
   Function --> API[Telegram multipart / file_id]
   Function <--> State[Upstash settings and delivery checkpoints]
 ```
@@ -50,7 +51,7 @@ Video/document albums upload in batches of 2 to bound temporary disk use; photo 
 
 ## Scraper reliability
 
-TikTok uses TikWM with Cobalt fallback. Other platforms use configured Cobalt endpoints with failover. Queue mode retries temporary resolution failures once. HTTP 429, 5xx, body timeouts and malformed replies are handled. Media requiring unsupported local merging is rejected instead of sending a silent video-only stream.
+TikTok uses TikWM with Cobalt fallback. Instagram uses the private same-project Python extractor with Cobalt fallback; other platforms use configured Cobalt endpoints with failover. Queue mode retries temporary resolution failures once. HTTP 429, 5xx, body timeouts and malformed replies are handled. Media requiring unsupported local merging is rejected instead of sending a silent video-only stream.
 
 `COBALT_API_KEY` is sent only to the primary configured endpoint. API redirects are rejected. Fallback instances must be authorized for your use and operated appropriately; their presence does not provide an uptime guarantee. Do not rotate arbitrary public instances or bypass their authentication/bot protection.
 
@@ -62,7 +63,7 @@ Instagram's undocumented query and access policies can change; no extractor can 
 
 ## Checks and operations
 
-`pnpm test` runs portable regression tests, excluding generated `dist` tests. `pnpm test:integration` runs Redis persistence/Lua/concurrency tests against a disposable local Redis server; `redis-server` and `redis-cli` are required (override with `REDIS_SERVER_BIN` / `REDIS_CLI_BIN`). It never connects to the production Redis database.
+`pnpm test` runs portable regression tests, excluding generated `dist` tests. Python regression tests: install `requirements.txt` in a Python 3.12 virtual environment, then run `python -m unittest discover -s tests -p 'test_instagram_python.py' -v`. `pnpm test:integration` runs Redis persistence/Lua/concurrency tests against a disposable local Redis server; `redis-server` and `redis-cli` are required (override with `REDIS_SERVER_BIN` / `REDIS_CLI_BIN`). It never connects to the production Redis database.
 
 Logs use update IDs and error codes rather than full user URLs or tokens. Check Vercel function logs, failed Inngest runs, Telegram `getWebhookInfo`, and Upstash usage before a quota is exhausted. Free tiers have finite quotas; the app cannot guarantee unlimited throughput or uninterrupted service after those limits.
 
@@ -70,4 +71,4 @@ Current published limits: [Inngest Free: 50,000 executions/month and 5 concurren
 
 Protocol references: [Telegram sending files](https://core.telegram.org/bots/api#sending-files), [Vercel duration limits](https://vercel.com/docs/functions/configuring-functions/duration), [Cobalt API contract](https://github.com/imputnet/cobalt/blob/main/docs/api.md).
 
-See `AUDIT_REPORT.md` for findings, fixes, verification and remaining external requirements. No changes have been deployed by the audit.
+See `AUDIT_REPORT.md` for findings, fixes, verification and remaining external requirements. The fixes are deployed to `telegram-video-bot-peach.vercel.app`. Production extraction + MP4 download of `DeXA5froeiC` passed (10,404,586 bytes, ~1.4 seconds); the age gate on `Dd-4gKENRms` is identified separately. Evidence: `audit/instagram-production-live.jsonl`. Queue/state services remain optional and are not activated without their credentials.

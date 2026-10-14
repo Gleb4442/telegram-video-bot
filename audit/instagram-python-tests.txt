@@ -1,0 +1,10 @@
+test_bounded_response_closes_after_overflow (test_instagram_python.InstagramTests.test_bounded_response_closes_after_overflow) ... ok
+test_invalid_shortcodes_never_reach_network (test_instagram_python.InstagramTests.test_invalid_shortcodes_never_reach_network) ... ok
+test_private_handler_requires_secret_before_reading_or_extracting (test_instagram_python.InstagramTests.test_private_handler_requires_secret_before_reading_or_extracting) ... ok
+test_query_has_exact_numeric_identity_and_returns_only_required_metadata (test_instagram_python.InstagramTests.test_query_has_exact_numeric_identity_and_returns_only_required_metadata) ... ok
+test_wrong_post_rejected (test_instagram_python.InstagramTests.test_wrong_post_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.001s
+
+OK
