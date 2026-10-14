@@ -1,11 +1,9 @@
 import { z } from "zod";
+import { getConfig } from "../../config.js";
+import { fetchJsonWithTimeout } from "../../utils/http.js";
 import { ResolverError, type ResolvedVideo, type MediaItem } from "../../types/resolver.js";
 import { platformForUrl, publicMediaUrl } from "../../utils/urls.js";
 
-const ORIGIN = "https://www.instagram.com";
-const QUERY = "PolarisLoggedOutDesktopWWWPostRootContentQuery";
-// Instagram's current logged-out query; see yt-dlp InstagramIE (2026.08.19).
-const DOCUMENT_ID = "27130156389949648";
 const MediaSchema = z.object({
   media_type: z.number().optional(),
   video_versions: z.array(z.object({ url: z.string() })).optional(),
@@ -77,43 +75,19 @@ export async function resolveInstagramDirect(url: string): Promise<ResolvedVideo
   const shortcode = match[1]!;
   const mediaId = instagramMediaId(shortcode);
   try {
-    // Lazy native import allows Cobalt fallback if a deployment lacks the binding.
-    const { Curl, CurlOpt } = await import("curl-cffi-node");
-    const curl = new Curl();
-    curl.impersonateStr("chrome136", true);
-    curl.enableCookies();
-    curl.setoptLong(CurlOpt.TimeoutMs, 10000);
-    curl.setoptLong(CurlOpt.ConnectTimeoutMs, 5000);
-    curl.setoptLong(CurlOpt.FollowLocation, 0);
-    curl.setoptLong(CurlOpt.SslVerifyPeer, 1);
-    curl.setoptLong(CurlOpt.SslVerifyHost, 2);
-    curl.setoptStr(CurlOpt.Url, ORIGIN + "/");
-    // Raw native API doesn't decode Content-Encoding. Request identity explicitly.
-    curl.setoptList(CurlOpt.HttpHeader, ["Accept-Encoding: identity"]);
-    const page = await curl.performAsync();
-    if (page.body.length > 4 * 1024 * 1024 || page.statusCode !== 200)
-      throw new Error("Instagram bootstrap failed");
-    const lsd = page.body.toString("utf8").match(/\["LSD",\[\],\{"token":"([^"]+)"/)?.[1];
-    if (!lsd) throw new Error("Instagram session token missing");
-    curl.setoptStr(CurlOpt.Url, ORIGIN + "/api/graphql");
-    curl.setoptLong(CurlOpt.Post, 1);
-    curl.setoptList(CurlOpt.HttpHeader, [
-      "Accept-Encoding: identity", "X-IG-App-ID: 936619743392459", "X-ASBD-ID: 359341",
-      "X-IG-WWW-Claim: 0", `Origin: ${ORIGIN}`, "Accept: */*",
-      `X-FB-Friendly-Name: ${QUERY}`, `X-FB-LSD: ${lsd}`,
-      "X-Requested-With: XMLHttpRequest", `Referer: ${ORIGIN}/reel/${shortcode}/`,
-      "Content-Type: application/x-www-form-urlencoded",
-    ]);
-    curl.setoptStr(CurlOpt.PostFields, new URLSearchParams({
-      lsd, fb_api_caller_class: "RelayModern", fb_api_req_friendly_name: QUERY,
-      server_timestamps: "true", variables: JSON.stringify({ media_id: mediaId }), doc_id: DOCUMENT_ID,
-    }).toString());
-    const result = await curl.performAsync();
-    if (result.statusCode === 429)
+    const config = getConfig();
+    const origin = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+    const endpoint = config.INSTAGRAM_EXTRACTOR_URL || (origin ? `https://${origin}/api/instagram` : undefined);
+    if (!endpoint) throw new Error("Instagram function URL missing in local mode");
+    const { response, data } = await fetchJsonWithTimeout(endpoint, {
+      method: "POST", redirect: "error", timeoutMs: 25000,
+      headers: { "Content-Type": "application/json", "x-telegram-bot-api-secret-token": config.TELEGRAM_SECRET_TOKEN },
+      body: JSON.stringify({ shortcode, media_id: mediaId }),
+    });
+    if (response.status === 429)
       throw new ResolverError("Instagram rate limit", "instagram", "RATE_LIMITED");
-    if (result.statusCode !== 200 || result.body.length > 4 * 1024 * 1024)
-      throw new Error("Instagram query failed");
-    return parseInstagramResponse(JSON.parse(result.body.toString("utf8")), shortcode);
+    if (!response.ok) throw new Error("Instagram function failed");
+    return parseInstagramResponse(data, shortcode);
   } catch (error) {
     if (error instanceof ResolverError) throw error;
     throw new ResolverError("Direct Instagram extraction failed", "instagram", "SCRAPER_DOWN");

@@ -34,6 +34,10 @@ export const ConfigSchema = z.object({
     .default("https://rue-cobalt.xenon.zone/"),
 
   COBALT_API_KEY: z.string().optional(),
+  INSTAGRAM_EXTRACTOR_URL: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().url().optional(),
+  ),
 
   UPSTASH_REDIS_REST_URL: z.preprocess(
     (v) => (v === "" ? undefined : v),

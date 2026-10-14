@@ -2,16 +2,16 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "functions": {
     "api/instagram-check.ts": {
-      "maxDuration": 60,
-      "includeFiles": "node_modules/.pnpm/curl-cffi-node@0.1.8/node_modules/curl-cffi-node/*.node"
+      "maxDuration": 60
     },
     "api/webhook.ts": {
-      "maxDuration": 60,
-      "includeFiles": "node_modules/.pnpm/curl-cffi-node@0.1.8/node_modules/curl-cffi-node/*.node"
+      "maxDuration": 60
     },
     "api/inngest.ts": {
-      "maxDuration": 300,
-      "includeFiles": "node_modules/.pnpm/curl-cffi-node@0.1.8/node_modules/curl-cffi-node/*.node"
+      "maxDuration": 300
+    },
+    "api/instagram.py": {
+      "maxDuration": 30
     }
   },
   "fluid": true

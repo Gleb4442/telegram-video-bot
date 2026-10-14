@@ -249,7 +249,7 @@
 - **Где:** `audit/instagram-live-probe.jsonl`.
 - **Причина / воспроизведение / влияние:** На 2 публичных reels оба endpoints вернули 400 error.api.fetch.empty.
 - **Причина:** Cobalt 11.7.1 (`a636575`) использует старую shortcode GraphQL query и embed. На публичном `DeXA5froeiC` оба instances возвращали `fetch.empty`; обычный Node fetch с новой query тоже получал HTML. Современная numeric-media-id query с browser-compatible TLS/HTTP2 возвращает progressive video streams. Отдельный `Dd-4gKENRms` имеет явный age gate (gating_type=3), подтверждённый браузером.
-- **Исправление:** Прямой anonymous Instagram extractor с текущей query и асинхронным curl-impersonate transport; Cobalt остаётся резервом. Проверка ID поста, безопасных URL, смешанных альбомов, отсутствующих video streams; age gate получает отдельное сообщение. Аккаунт Instagram и платные сервисы не подключались.
+- **Исправление:** Прямой anonymous Instagram extractor с текущей query и curl-impersonate transport в приватной Python-функции того же Vercel проекта; Cobalt остаётся резервом. Проверка ID поста, безопасных URL, смешанных альбомов, отсутствующих video streams; age gate получает отдельное сообщение. Аккаунт Instagram и платные сервисы не подключались.
 - **Статус:** Fixed / Verified локально реальным скачиванием `DeXA5froeiC` через код приложения: 10 404 586 байт, 106.14 секунды, H.264 + AAC. Анонимное скачивание age-gated ролика не заявляется исправленным: Instagram требует авторизацию.
 - **Тесты:** `tests/instagram.test.ts`; `scripts/probe-instagram-direct.ts`; `audit/instagram-direct-live.jsonl`.
 
@@ -304,7 +304,7 @@
 ## Проверка и границы доказательств
 
 - `pnpm typecheck`, `pnpm build`, `git diff --check` — успешны.
-- Portable suite: 121 тест; Redis integration: 4 теста. Итог 125 (Redis suite проверена ранее; повторно не запускалась при этой правке). Отдельная integration suite использовала настоящий Redis 8.2.2 в одноразовом temporary окружении, REST adapter Upstash SDK и реальные Lua-команды; проверены persistence, concurrent toggles, quota replay и delivery checkpoints. Production Redis не затрагивался.
+- Portable TypeScript suite: 125 тестов; Python suite: 5 тестов; Redis integration: 4 теста (проверена ранее). Отдельная integration suite использовала настоящий Redis 8.2.2 в одноразовом temporary окружении, REST adapter Upstash SDK и реальные Lua-команды; проверены persistence, concurrent toggles, quota replay и delivery checkpoints. Production Redis не затрагивался.
 - Загружен синтетический 30 МБ stream на диск; проверены declared/chunked oversize, hung body cancellation, cleanup, HTML вместо media, private redirects и pinned DNS. Telegram API/источники в regression tests моделируются. Не было реальной отправки 30 МБ файла в Telegram.
 - Оба пользовательских reels проверены на обоих configured Cobalt endpoints:4 ответа 400 `error.api.fetch.empty`. Public Instagram HTML/embed также не дали извлекаемого media URL. Повторное расследование 2026-10-15 выделило устаревший extractor и age gating; см. R09. Первый ролик теперь скачан реальным кодом приложения, второй корректно распознаётся как age restricted.
 - Настоящий downloader также успешно получил публичный CC0 MP4 с MDN (1,128,375 байт), выполнил DNS/socket проверки и очистил файл; `audit/live-download.jsonl`.

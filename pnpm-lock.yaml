@@ -19,9 +19,6 @@ importers:
       '@upstash/redis':
         specifier: ^1.39.0
         version: 1.39.0
-      curl-cffi-node:
-        specifier: 0.1.8
-        version: 0.1.8
       dotenv:
         specifier: ^16.4.7
         version: 16.6.1
@@ -1007,10 +1004,6 @@ packages:
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
     engines: {node: '>= 8'}
-
-  curl-cffi-node@0.1.8:
-    resolution: {integrity: sha512-4RSaBdr0C6ZVfKnzj4h+IpKPq7z18kF2OByVKQGo3/3FcVg1vMABWBboo80x93uSIOY0ogylyUL2+FcnG6NVFA==}
-    engines: {node: '>=18'}
 
   data-uri-to-buffer@4.0.1:
     resolution: {integrity: sha512-0R9ikRb668HB7QDxT1vkpuUBtqc53YyAwMwGeUFKRojY/NWKvdZ+9UYtRfGmhqNbRkTSVpMbmyhXipFFv2cb/A==}
@@ -2673,8 +2666,6 @@ snapshots:
       path-key: 3.1.1
       shebang-command: 2.0.0
       which: 2.0.2
-
-  curl-cffi-node@0.1.8: {}
 
   data-uri-to-buffer@4.0.1: {}
 
