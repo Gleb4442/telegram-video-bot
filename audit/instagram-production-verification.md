@@ -13,6 +13,6 @@ https://vercel.com/glebw2008-7382s-projects/telegram-video-bot/sApzHvg4hM1Lqyn1j
 - Telegram getWebhookInfo: correct existing production alias; pending updates 0; last_error absent.
 - TypeScript: 125 tests passed; typecheck/build passed. Python: 5 tests passed. Earlier Redis integration: 4 passed, not rerun for this extractor change.
 - No messages sent to Telegram by these probes; no bot webhook replacement, pending-update deletion, paid service, or Instagram account cookies used.
-- Actual delivery to the user's Telegram chat: user confirmation requested separately; extraction + source-to-Vercel file transfer are independently verified.
+- Actual delivery to the user's Telegram chat: confirmed by the user on 2026-10-15 (response: «Видео пришло»). End-to-end extraction, download and Telegram delivery of DeXA5froeiC passed.
 
 The initial Node native-addon deployment failed its cloud probe (see instagram-production-initial.jsonl). It was replaced by the Python 3.12 function with curl_cffi 0.16.3; no Node curl addon remains.
